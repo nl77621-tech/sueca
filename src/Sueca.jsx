@@ -344,9 +344,9 @@ const TrickArea = ({ trick, trickWinner }) => {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '80px 80px 80px',
-      gridTemplateRows: '80px 80px 80px',
-      gap: 4,
+      gridTemplateColumns: '120px 120px 120px',
+      gridTemplateRows: '120px 120px 120px',
+      gap: 8,
     }}>
       {[0, 1, 2, 3].map(pi => {
         const pos = positions[pi];
@@ -363,7 +363,7 @@ const TrickArea = ({ trick, trickWinner }) => {
                 position: 'relative',
                 animation: 'cardSlide 0.3s cubic-bezier(.4,0,.2,1)',
               }}>
-                <Card card={play.card} small />
+                <Card card={play.card} />
                 {isWinner && (
                   <div style={{
                     position: 'absolute', top: -10, right: -10,
@@ -373,7 +373,7 @@ const TrickArea = ({ trick, trickWinner }) => {
               </div>
             ) : (
               <div style={{
-                width: 42, height: 58, borderRadius: 6,
+                width: 64, height: 90, borderRadius: 8,
                 border: '2px dashed rgba(255,255,255,0.15)',
                 opacity: 0.5,
               }} />
