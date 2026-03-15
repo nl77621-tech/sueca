@@ -429,16 +429,16 @@ const Welcome = ({ onStart }) => (
   }}>
     {/* Decorative tiles background */}
     <div style={{
-      position: 'absolute', inset: 0, opacity: 0.04,
+      position: 'absolute', inset: 0, opacity: 0.04, pointerEvents: 'none',
       backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(255,255,255,1) 40px, rgba(255,255,255,1) 41px),
                         repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,1) 40px, rgba(255,255,255,1) 41px)`,
     }} />
 
     {/* Suit decorations */}
-    <div style={{ position: 'absolute', top: 40, left: 40, fontSize: 80, opacity: 0.06 }}>♠</div>
-    <div style={{ position: 'absolute', top: 40, right: 40, fontSize: 80, opacity: 0.06, color: '#dc2626' }}>♥</div>
-    <div style={{ position: 'absolute', bottom: 40, left: 40, fontSize: 80, opacity: 0.06, color: '#dc2626' }}>♦</div>
-    <div style={{ position: 'absolute', bottom: 40, right: 40, fontSize: 80, opacity: 0.06 }}>♣</div>
+    <div style={{ position: 'absolute', top: 40, left: 40, fontSize: 80, opacity: 0.06, pointerEvents: 'none' }}>♠</div>
+    <div style={{ position: 'absolute', top: 40, right: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♥</div>
+    <div style={{ position: 'absolute', bottom: 40, left: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♦</div>
+    <div style={{ position: 'absolute', bottom: 40, right: 40, fontSize: 80, opacity: 0.06, pointerEvents: 'none' }}>♣</div>
 
     {/* Title */}
     <div style={{ textAlign: 'center', marginBottom: 48, position: 'relative' }}>
