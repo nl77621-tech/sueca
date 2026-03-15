@@ -182,7 +182,7 @@ const reduce = (state, action) => {
 // CARD COMPONENTS
 // ═══════════════════════════════════════════
 const Card = ({ card, onClick, hilite, sel, small }) => {
-  const w = small ? 42 : 64, h = small ? 58 : 90;
+  const w = small ? 54 : 96, h = small ? 76 : 134;
   const red = RED[card.si];
   return (
     <div onClick={onClick} style={{
@@ -190,7 +190,7 @@ const Card = ({ card, onClick, hilite, sel, small }) => {
       background: sel ? '#fffbeb' : 'white',
       border: `2px solid ${sel ? '#f59e0b' : hilite ? '#22c55e' : '#e2e8f0'}`,
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-      padding: small ? '2px 3px' : '5px 6px',
+      padding: small ? '3px 4px' : '7px 8px',
       boxShadow: sel
         ? '0 0 0 3px #f59e0b88, 0 8px 20px rgba(0,0,0,0.4)'
         : hilite
@@ -203,12 +203,12 @@ const Card = ({ card, onClick, hilite, sel, small }) => {
       color: red ? '#dc2626' : '#1e293b',
       fontFamily: 'Georgia, serif', fontWeight: 'bold',
     }}>
-      <div style={{ fontSize: small ? 10 : 13, lineHeight: 1.15, alignSelf: 'flex-start' }}>
+      <div style={{ fontSize: small ? 13 : 18, lineHeight: 1.15, alignSelf: 'flex-start' }}>
         {card.v}<br />{card.s}
       </div>
-      <div style={{ fontSize: small ? 20 : 28, textAlign: 'center', lineHeight: 1 }}>{card.s}</div>
+      <div style={{ fontSize: small ? 26 : 40, textAlign: 'center', lineHeight: 1 }}>{card.s}</div>
       <div style={{
-        fontSize: small ? 10 : 13, lineHeight: 1.15,
+        fontSize: small ? 13 : 18, lineHeight: 1.15,
         alignSelf: 'flex-end', transform: 'rotate(180deg)',
       }}>
         {card.v}<br />{card.s}
@@ -218,7 +218,7 @@ const Card = ({ card, onClick, hilite, sel, small }) => {
 };
 
 const CardBack = ({ small, rotated }) => {
-  const w = small ? 42 : 64, h = small ? 58 : 90;
+  const w = small ? 54 : 96, h = small ? 76 : 134;
   return (
     <div style={{
       width: rotated ? h : w, height: rotated ? w : h, borderRadius: 8,
@@ -344,9 +344,9 @@ const TrickArea = ({ trick, trickWinner }) => {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '120px 120px 120px',
-      gridTemplateRows: '120px 120px 120px',
-      gap: 8,
+      gridTemplateColumns: '160px 160px 160px',
+      gridTemplateRows: '160px 160px 160px',
+      gap: 10,
     }}>
       {[0, 1, 2, 3].map(pi => {
         const pos = positions[pi];
@@ -373,7 +373,7 @@ const TrickArea = ({ trick, trickWinner }) => {
               </div>
             ) : (
               <div style={{
-                width: 64, height: 90, borderRadius: 8,
+                width: 96, height: 134, borderRadius: 8,
                 border: '2px dashed rgba(255,255,255,0.15)',
                 opacity: 0.5,
               }} />
