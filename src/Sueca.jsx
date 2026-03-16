@@ -1,4 +1,4 @@
-import { useReducer, useEffect } from "react";
+import { useReducer, useEffect, useRef, useState } from "react";
 
 // ═══════════════════════════════════════════
 // CONSTANTS
@@ -180,6 +180,13 @@ const reduce = (state, action) => {
         phase: 'playing', sel: null,
         msg: state.trickWinner === 0 ? '✨ Você lidera! Escolha uma carta.' : `${PNAME[state.trickWinner]} lidera…`
       };
+    case 'REORDER_HAND': {
+      const { from, to } = action;
+      const hand = [...state.hands[0]];
+      const [moved] = hand.splice(from, 1);
+      hand.splice(to, 0, moved);
+      return { ...state, hands: state.hands.map((h, i) => i === 0 ? hand : h) };
+    }
     default: return state;
   }
 };
@@ -297,28 +304,59 @@ const SideHand = ({ count, side }) => {
   );
 };
 
-const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay }) => {
+const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder }) => {
   const vd = new Set(validCards(hand, trick, trump).map(c => c.id));
   const spread = 52;
   const n = hand.length;
   const totalW = n > 1 ? (n - 1) * spread + 64 : 64;
+  const dragIdx = useRef(null);
+  const [overIdx, setOverIdx] = useState(null);
 
   return (
     <div style={{ position: 'relative', width: Math.min(totalW, 700), height: 110, flexShrink: 0 }}>
       {hand.map((card, i) => {
         const isHilite = vd.has(card.id);
         const isSel = sel?.id === card.id;
+        const isOver = overIdx === i && dragIdx.current !== i;
         const xPos = n > 1 ? (i / (n - 1)) * (Math.min(totalW, 700) - 64) : 0;
         return (
-          <div key={card.id} style={{
-            position: 'absolute',
-            left: xPos,
-            bottom: 0,
-            transform: `rotate(${(i - (n - 1) / 2) * 2.5}deg)`,
-            transformOrigin: 'bottom center',
-            zIndex: isSel ? 20 : i,
-            transition: 'left 0.3s ease',
-          }}>
+          <div
+            key={card.id}
+            draggable
+            onDragStart={e => {
+              dragIdx.current = i;
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            onDragOver={e => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              if (overIdx !== i) setOverIdx(i);
+            }}
+            onDragLeave={() => setOverIdx(null)}
+            onDrop={e => {
+              e.preventDefault();
+              if (dragIdx.current !== null && dragIdx.current !== i) {
+                onReorder(dragIdx.current, i);
+              }
+              dragIdx.current = null;
+              setOverIdx(null);
+            }}
+            onDragEnd={() => {
+              dragIdx.current = null;
+              setOverIdx(null);
+            }}
+            style={{
+              position: 'absolute',
+              left: xPos,
+              bottom: 0,
+              transform: `rotate(${(i - (n - 1) / 2) * 2.5}deg) ${isOver ? 'translateY(-14px)' : ''}`,
+              transformOrigin: 'bottom center',
+              zIndex: isSel ? 20 : isOver ? 15 : i,
+              transition: 'left 0.3s ease, transform 0.15s ease, opacity 0.15s',
+              cursor: 'grab',
+              opacity: dragIdx.current === i ? 0.45 : 1,
+            }}
+          >
             <Card
               card={card}
               hilite={isHilite}
@@ -822,6 +860,7 @@ export default function Sueca() {
               sel={state.sel}
               onSel={card => dispatch({ type: 'SEL', card })}
               onPlay={card => dispatch({ type: 'PLAY', pi: 0, card })}
+              onReorder={(from, to) => dispatch({ type: 'REORDER_HAND', from, to })}
             />
           </div>
           <div style={{
