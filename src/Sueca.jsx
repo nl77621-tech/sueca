@@ -25,13 +25,17 @@ const useGameScale = () => {
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
+  // Free TURN relay — handles symmetric NAT that STUN alone can't traverse
+  { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turns:openrelay.metered.ca:443',username: 'openrelayproject', credential: 'openrelayproject' },
 ];
 
 const useWebRTC = ({ wsRef, myPositionRef, playersRef }) => {
   const localStreamRef  = useRef(null);
-  const pcsRef          = useRef({});        // position → RTCPeerConnection
-  const makingOfferRef  = useRef({});        // position → bool
+  const pcsRef          = useRef({});   // position → RTCPeerConnection
+  const makingOfferRef  = useRef({});   // position → bool
+  const selfRef         = useRef({});   // keeps helpers fresh for inner closures
   const [localStream,   setLocalStream]   = useState(null);
   const [remoteStreams, setRemoteStreams]  = useState({});
   const [audioEnabled,  setAudioEnabled]  = useState(true);
@@ -40,24 +44,29 @@ const useWebRTC = ({ wsRef, myPositionRef, playersRef }) => {
   const myPos  = () => myPositionRef.current;
   const sendWS = (msg) => wsRef.current?.readyState === 1 && wsRef.current.send(JSON.stringify(msg));
 
-  const getOrCreatePC = useCallback((remotePos) => {
-    if (pcsRef.current[remotePos]) return pcsRef.current[remotePos];
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  const addTracksToPC = (pc, stream) => {
+    const senders = pc.getSenders();
+    stream.getTracks().forEach(t => {
+      if (!senders.some(s => s.track?.id === t.id)) pc.addTrack(t, stream);
+    });
+  };
+
+  // Create a brand-new RTCPeerConnection for remotePos, wiring up all handlers.
+  const createPC = (remotePos) => {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS, bundlePolicy: 'max-bundle' });
     pcsRef.current[remotePos] = pc;
     makingOfferRef.current[remotePos] = false;
+    let reconnectTimer = null;
 
     pc.ontrack = e => {
       const stream = e.streams[0];
       if (stream) setRemoteStreams(prev => ({ ...prev, [remotePos]: stream }));
     };
+
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) sendWS({ type: 'RTC_ICE', toPosition: remotePos, candidate });
     };
-    pc.onconnectionstatechange = () => {
-      if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
-        setRemoteStreams(prev => { const n = { ...prev }; delete n[remotePos]; return n; });
-      }
-    };
+
     pc.onnegotiationneeded = async () => {
       try {
         makingOfferRef.current[remotePos] = true;
@@ -66,35 +75,84 @@ const useWebRTC = ({ wsRef, myPositionRef, playersRef }) => {
       } catch (e) { console.error('negotiation:', e); }
       finally { makingOfferRef.current[remotePos] = false; }
     };
-    return pc;
-  }, []);
 
-  const addTracksToPC = (pc, stream) => {
-    const senders = pc.getSenders();
-    stream.getTracks().forEach(t => {
-      if (!senders.some(s => s.track?.id === t.id)) pc.addTrack(t, stream);
-    });
+    pc.onconnectionstatechange = () => {
+      const s = pc.connectionState;
+      console.log(`[RTC] pos=${remotePos} → ${s}`);
+
+      if (s === 'connected') {
+        clearTimeout(reconnectTimer);
+      }
+
+      // If disconnected, wait 5 s then try an ICE restart (soft recover)
+      if (s === 'disconnected') {
+        reconnectTimer = setTimeout(() => {
+          if (pcsRef.current[remotePos] !== pc) return;
+          if (pc.connectionState !== 'connected' && myPos() < remotePos) {
+            makingOfferRef.current[remotePos] = true;
+            pc.createOffer({ iceRestart: true })
+              .then(o => pc.setLocalDescription(o))
+              .then(() => sendWS({ type: 'RTC_OFFER', toPosition: remotePos, sdp: pc.localDescription }))
+              .catch(console.error)
+              .finally(() => { makingOfferRef.current[remotePos] = false; });
+          }
+        }, 5000);
+        setRemoteStreams(prev => { const n = { ...prev }; delete n[remotePos]; return n; });
+      }
+
+      // Hard failure → close, delete, recreate from the lower-position side
+      if (s === 'failed') {
+        clearTimeout(reconnectTimer);
+        setRemoteStreams(prev => { const n = { ...prev }; delete n[remotePos]; return n; });
+        if (pcsRef.current[remotePos] === pc) {
+          pc.close();
+          delete pcsRef.current[remotePos];
+          delete makingOfferRef.current[remotePos];
+          if (myPos() < remotePos && localStreamRef.current) {
+            setTimeout(() => {
+              if (!pcsRef.current[remotePos]) {
+                const newPc = selfRef.current.getOrCreatePC(remotePos);
+                selfRef.current.addTracksToPC(newPc, localStreamRef.current);
+              }
+            }, 2000);
+          }
+        }
+      }
+
+      if (s === 'closed') {
+        clearTimeout(reconnectTimer);
+        setRemoteStreams(prev => { const n = { ...prev }; delete n[remotePos]; return n; });
+      }
+    };
+
+    return pc;
   };
+
+  const getOrCreatePC = (remotePos) => {
+    if (pcsRef.current[remotePos]) return pcsRef.current[remotePos];
+    return createPC(remotePos);
+  };
+
+  // Keep selfRef fresh so inner closure callbacks always call the latest version
+  selfRef.current = { getOrCreatePC, addTracksToPC };
 
   const handleSignal = useCallback(async (msg) => {
     const from = msg.fromPosition;
     if (from === undefined || from === myPos()) return;
 
     if (msg.type === 'RTC_READY') {
-      // I have media & I'm the lower-position player → I make the offer
       if (localStreamRef.current && myPos() < from) {
         const pc = getOrCreatePC(from);
         addTracksToPC(pc, localStreamRef.current);
-        // addTrack triggers onnegotiationneeded → sends offer automatically
       }
       return;
     }
 
     if (msg.type === 'RTC_OFFER') {
-      const polite = myPos() > from;   // higher position = polite peer
+      const polite = myPos() > from;
       const pc = getOrCreatePC(from);
       const collision = makingOfferRef.current[from] || pc.signalingState !== 'stable';
-      if (collision && !polite) return; // impolite ignores glare
+      if (collision && !polite) return;
       if (collision && polite) {
         try { await pc.setLocalDescription({ type: 'rollback' }); } catch {}
       }
@@ -120,12 +178,14 @@ const useWebRTC = ({ wsRef, myPositionRef, playersRef }) => {
         try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
       }
     }
-  }, [getOrCreatePC]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const enableMedia = useCallback(async (withVideo = true) => {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
-      video: withVideo ? { width: 320, height: 240, facingMode: 'user' } : false,
+      // Lower frame rate reduces bandwidth with 4 simultaneous streams
+      video: withVideo ? { width: 320, height: 240, facingMode: 'user', frameRate: { ideal: 15, max: 20 } } : false,
     });
     localStreamRef.current?.getTracks().forEach(t => t.stop());
     localStreamRef.current = stream;
@@ -133,19 +193,17 @@ const useWebRTC = ({ wsRef, myPositionRef, playersRef }) => {
     setAudioEnabled(true);
     setVideoEnabled(withVideo);
 
-    // Add tracks to any existing peer connections
     for (const pc of Object.values(pcsRef.current)) addTracksToPC(pc, stream);
 
-    // Broadcast readiness; also connect to lower-position players we should offer
     sendWS({ type: 'RTC_READY', toPosition: -1 });
     for (const p of (playersRef.current || [])) {
       if (p.position !== myPos() && myPos() < p.position) {
         const pc = getOrCreatePC(p.position);
         addTracksToPC(pc, stream);
-        // onnegotiationneeded fires → sends offer
       }
     }
-  }, [getOrCreatePC]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const disableMedia = useCallback(() => {
     localStreamRef.current?.getTracks().forEach(t => t.stop());
