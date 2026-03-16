@@ -22,6 +22,74 @@ const useGameScale = () => {
 // ═══════════════════════════════════════════
 // WEBRTC HOOK  (peer-to-peer video & audio)
 // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+// TRANSLATIONS  (pt | en)
+// ═══════════════════════════════════════════
+const T = {
+  pt: {
+    subtitle: 'Jogo de Cartas Português',
+    playSolo: '▶ JOGAR SOLO', playOnline: '🌐 JOGAR ONLINE',
+    soloHint: 'Solo: você + 3 robôs · Online: até 4 jogadores reais',
+    createRoom: 'CRIAR SALA', joinRoom: 'ENTRAR EM SALA',
+    yourName: 'O seu nome', connecting: 'A ligar…',
+    createBtn: '+ CRIAR SALA', joinBtn: '→ ENTRAR',
+    mainMenu: '← Menu Principal', back: '← Voltar',
+    gameRoom: 'SALA DE JOGO',
+    chooseSeat: 'Escolhe o teu lugar · Equipas: Sul+Norte vs Oeste+Este',
+    youLabel: 'VOCÊ', sitHere: '+ Sentar aqui', waiting: 'Aguardando…',
+    teamA: 'EQUIPA A', teamB: 'EQUIPA B',
+    scanQr: 'Digitalizar para entrar',
+    copyLink: '🔗 Copiar Link', copied: '✓ Copiado!',
+    liveAV: 'VÍDEO & ÁUDIO EM TEMPO REAL',
+    cameraOn: '📷 Câmara activa', cameraEnable: '📷 Ativar câmara + microfone',
+    cameraHint: 'Opcional · os outros jogadores vêem e ouvem-te em directo',
+    startGame: '▶ INICIAR JOGO', leave: '← Sair',
+    south: 'Sul', north: 'Norte', west: 'Oeste', east: 'Este',
+    victory: 'Vitória!', defeat: 'Derrota!',
+    teamWon: 'A vossa equipa ganhou esta rodada',
+    teamLost: 'Os adversários ganharam esta rodada',
+    gamesWon: 'Partidas ganhas', us: 'Nós', them: 'Eles',
+    newRound: 'Nova Rodada', newGame: 'Novo Jogo',
+    US: 'NÓS', THEM: 'ELES', TRUMP: 'TRUNFO', DEALER: 'DADOR', NEXT: 'VEZ',
+    tricks: 'vazas', room: 'Sala', you: 'Você', trumpLabel: 'trunfo',
+    rejoiningMsg: 'A rejoin a sala…', reconnecting: 'A reconnectar ao jogo', cancel: 'Cancelar',
+    muteBtn: 'Silenciar', unmuteBtn: 'Ativar microfone',
+    videoOff: 'Desligar vídeo', videoOn: 'Ligar vídeo',
+    pname: ['Sul', 'Oeste', 'Norte', 'Este'],
+  },
+  en: {
+    subtitle: 'Portuguese Card Game',
+    playSolo: '▶ PLAY SOLO', playOnline: '🌐 PLAY ONLINE',
+    soloHint: 'Solo: you + 3 bots · Online: up to 4 real players',
+    createRoom: 'CREATE ROOM', joinRoom: 'JOIN ROOM',
+    yourName: 'Your name', connecting: 'Connecting…',
+    createBtn: '+ CREATE ROOM', joinBtn: '→ JOIN',
+    mainMenu: '← Main Menu', back: '← Back',
+    gameRoom: 'GAME ROOM',
+    chooseSeat: 'Choose your seat · Teams: South+North vs West+East',
+    youLabel: 'YOU', sitHere: '+ Sit here', waiting: 'Waiting…',
+    teamA: 'TEAM A', teamB: 'TEAM B',
+    scanQr: 'Scan to join',
+    copyLink: '🔗 Copy Link', copied: '✓ Copied!',
+    liveAV: 'LIVE VIDEO & AUDIO',
+    cameraOn: '📷 Camera on', cameraEnable: '📷 Enable camera + microphone',
+    cameraHint: 'Optional · other players will see and hear you live',
+    startGame: '▶ START GAME', leave: '← Leave',
+    south: 'South', north: 'North', west: 'West', east: 'East',
+    victory: 'Victory!', defeat: 'Defeat!',
+    teamWon: 'Your team won this round',
+    teamLost: 'The opponents won this round',
+    gamesWon: 'Games won', us: 'Us', them: 'Them',
+    newRound: 'New Round', newGame: 'New Game',
+    US: 'US', THEM: 'THEM', TRUMP: 'TRUMP', DEALER: 'DEALER', NEXT: 'NEXT',
+    tricks: 'tricks', room: 'Room', you: 'You', trumpLabel: 'trump',
+    rejoiningMsg: 'Rejoining room…', reconnecting: 'Reconnecting to game', cancel: 'Cancel',
+    muteBtn: 'Mute', unmuteBtn: 'Unmute microphone',
+    videoOff: 'Turn off video', videoOn: 'Turn on video',
+    pname: ['South', 'West', 'North', 'East'],
+  },
+};
+
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
@@ -492,7 +560,8 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1 }) => {
 // ═══════════════════════════════════════════
 const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
                  localStream, onEnableMedia, onDisableMedia,
-                 audioEnabled, videoEnabled, onToggleAudio, onToggleVideo }) => {
+                 audioEnabled, videoEnabled, onToggleAudio, onToggleVideo, lang }) => {
+  const tr = T[lang];
   const gameUrl = `${window.location.origin}/?room=${roomId}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(gameUrl)}`;
   const [copied, setCopied] = useState(false);
@@ -503,10 +572,10 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
 
   // Seat metadata: position → { label, icon, teamColor, teamLabel }
   const seats = [
-    { pos: 0, label: 'Sul',   dir: '↓', team: 0, teamName: 'Equipa A', teamColor: '#60a5fa' },
-    { pos: 1, label: 'Oeste', dir: '←', team: 1, teamName: 'Equipa B', teamColor: '#f472b6' },
-    { pos: 2, label: 'Norte', dir: '↑', team: 0, teamName: 'Equipa A', teamColor: '#60a5fa' },
-    { pos: 3, label: 'Este',  dir: '→', team: 1, teamName: 'Equipa B', teamColor: '#f472b6' },
+    { pos: 0, label: tr.south, dir: '↓', team: 0, teamName: tr.teamA, teamColor: '#60a5fa' },
+    { pos: 1, label: tr.west,  dir: '←', team: 1, teamName: tr.teamB, teamColor: '#f472b6' },
+    { pos: 2, label: tr.north, dir: '↑', team: 0, teamName: tr.teamA, teamColor: '#60a5fa' },
+    { pos: 3, label: tr.east,  dir: '→', team: 1, teamName: tr.teamB, teamColor: '#f472b6' },
   ];
 
   // Group by team for display
@@ -537,7 +606,7 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
           <span style={{ fontSize: 11, color: seat.teamColor, fontWeight: 'bold' }}>
             {seat.label} {seat.dir}
           </span>
-          {isMe && <span style={{ fontSize: 9, color: '#fcd34d', letterSpacing: 1 }}>VOCÊ</span>}
+          {isMe && <span style={{ fontSize: 9, color: '#fcd34d', letterSpacing: 1 }}>{tr.youLabel}</span>}
           {occupant && !isMe && (
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: occupant.connected ? '#22c55e' : '#475569' }} />
           )}
@@ -553,7 +622,7 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
           </div>
         ) : (
           <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
-            {canSit ? <span style={{ color: '#64748b' }}>+ Sentar aqui</span> : <span>Aguardando…</span>}
+            {canSit ? <span style={{ color: '#64748b' }}>{tr.sitHere}</span> : <span>{tr.waiting}</span>}
           </div>
         )}
       </div>
@@ -583,28 +652,28 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
     }}>
       {/* Room code */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 11, letterSpacing: 6, color: '#90caf9', marginBottom: 4 }}>SALA DE JOGO</div>
+        <div style={{ fontSize: 11, letterSpacing: 6, color: '#90caf9', marginBottom: 4 }}>{tr.gameRoom}</div>
         <div style={{
           fontSize: 'clamp(40px, 10vw, 60px)', fontWeight: 'bold', letterSpacing: 14,
           background: 'linear-gradient(135deg, #fcd34d, #f59e0b)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
         }}>{roomId}</div>
         <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
-          Escolhe o teu lugar · Equipas: Sul+Norte vs Oeste+Este
+          {tr.chooseSeat}
         </div>
       </div>
 
       {/* Teams side by side */}
       <div style={{ display: 'flex', gap: 12, width: '100%', maxWidth: 520, alignItems: 'stretch' }}>
-        <TeamColumn seats={teamA} label="EQUIPA A" color="#60a5fa" />
-        <TeamColumn seats={teamB} label="EQUIPA B" color="#f472b6" />
+        <TeamColumn seats={teamA} label={tr.teamA} color="#60a5fa" />
+        <TeamColumn seats={teamB} label={tr.teamB} color="#f472b6" />
       </div>
 
       {/* QR + link row */}
       <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
           <img src={qrUrl} alt="QR Code" style={{ borderRadius: 10, border: '2px solid rgba(255,255,255,0.12)', width: 'min(120px, 30vw)', height: 'min(120px, 30vw)' }} />
-          <div style={{ fontSize: 10, color: '#475569' }}>Digitalizar para entrar</div>
+          <div style={{ fontSize: 10, color: '#475569' }}>{tr.scanQr}</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
           <div style={{
@@ -618,14 +687,14 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
             color: copied ? '#86efac' : 'white', cursor: 'pointer', fontSize: 12,
             fontFamily: 'Georgia, serif',
           }}>
-            {copied ? '✓ Copiado!' : '🔗 Copiar Link'}
+            {copied ? tr.copied : tr.copyLink}
           </button>
         </div>
       </div>
 
       {/* Media controls */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-        <div style={{ fontSize: 10, color: '#475569', letterSpacing: 1 }}>VÍDEO & ÁUDIO EM TEMPO REAL</div>
+        <div style={{ fontSize: 10, color: '#475569', letterSpacing: 1 }}>{tr.liveAV}</div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
           <button
             onClick={() => localStream
@@ -638,17 +707,17 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
               border: `1px solid ${localStream ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.2)'}`,
               color: localStream ? '#86efac' : '#94a3b8',
             }}>
-            {localStream ? '📷 Câmara activa' : '📷 Ativar câmara + microfone'}
+            {localStream ? tr.cameraOn : tr.cameraEnable}
           </button>
           {localStream && (<>
-            <button onClick={onToggleAudio} title={audioEnabled ? 'Silenciar' : 'Ativar microfone'} style={{
+            <button onClick={onToggleAudio} title={audioEnabled ? tr.muteBtn : tr.unmuteBtn} style={{
               width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 15,
               background: audioEnabled ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
               color: audioEnabled ? '#86efac' : '#fca5a5',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>{audioEnabled ? '🎤' : '🔇'}</button>
             {localStream.getVideoTracks().length > 0 && (
-              <button onClick={onToggleVideo} title={videoEnabled ? 'Desligar vídeo' : 'Ligar vídeo'} style={{
+              <button onClick={onToggleVideo} title={videoEnabled ? tr.videoOff : tr.videoOn} style={{
                 width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 15,
                 background: videoEnabled ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
                 color: videoEnabled ? '#86efac' : '#fca5a5',
@@ -659,7 +728,7 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
         </div>
         {!localStream && (
           <div style={{ fontSize: 10, color: '#334155', textAlign: 'center' }}>
-            Opcional · os outros jogadores vêem e ouvem-te em directo
+            {tr.cameraHint}
           </div>
         )}
       </div>
@@ -673,7 +742,7 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
           fontFamily: 'Georgia, serif', letterSpacing: 2,
           boxShadow: '0 4px 20px rgba(245,158,11,0.4)',
         }}>
-          ▶ INICIAR JOGO
+          {tr.startGame}
         </button>
         <button onClick={onLeave} style={{
           padding: '12px 24px', borderRadius: 30,
@@ -681,7 +750,7 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
           background: 'rgba(255,255,255,0.05)',
           color: '#94a3b8', cursor: 'pointer', fontSize: 13, fontFamily: 'Georgia, serif',
         }}>
-          ← Sair
+          {tr.leave}
         </button>
       </div>
     </div>
@@ -691,7 +760,8 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
 // ═══════════════════════════════════════════
 // WELCOME SCREEN
 // ═══════════════════════════════════════════
-const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
+const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError, lang, onToggleLang }) => {
+  const tr = T[lang];
   const urlRoom = new URLSearchParams(window.location.search).get('room');
   const [view, setView] = useState(urlRoom ? 'join' : 'main');
   const [name, setName] = useState('');
@@ -716,6 +786,20 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
     onJoinRoom(name.trim(), joinCode.trim().toUpperCase());
   };
 
+  const LangToggle = () => (
+    <button onClick={onToggleLang} style={{
+      position: 'absolute', top: 16, right: 16,
+      padding: '6px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.2)',
+      background: 'rgba(255,255,255,0.08)', color: 'white', cursor: 'pointer',
+      fontSize: 12, fontFamily: 'Georgia, serif', letterSpacing: 1,
+      display: 'flex', alignItems: 'center', gap: 6,
+    }}>
+      <span style={{ opacity: lang === 'pt' ? 1 : 0.4 }}>PT</span>
+      <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+      <span style={{ opacity: lang === 'en' ? 1 : 0.4 }}>EN</span>
+    </button>
+  );
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -724,6 +808,7 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
       fontFamily: 'Georgia, serif', color: 'white', padding: 24,
       position: 'relative', overflow: 'hidden',
     }}>
+      <LangToggle />
       <div style={{ position: 'absolute', top: 40, left: 40, fontSize: 80, opacity: 0.06, pointerEvents: 'none' }}>♠</div>
       <div style={{ position: 'absolute', top: 40, right: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♥</div>
       <div style={{ position: 'absolute', bottom: 40, left: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♦</div>
@@ -731,7 +816,7 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
 
       {/* Title */}
       <div style={{ textAlign: 'center', marginBottom: 36, position: 'relative' }}>
-        <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', letterSpacing: 8, color: '#90caf9', marginBottom: 8 }}>Jogo de Cartas Português</div>
+        <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', letterSpacing: 8, color: '#90caf9', marginBottom: 8 }}>{tr.subtitle}</div>
         <h1 style={{
           fontSize: 'clamp(52px, 15vw, 88px)', margin: 0, letterSpacing: 12, fontWeight: 'bold',
           background: 'linear-gradient(135deg, #fcd34d, #f59e0b, #fbbf24)',
@@ -752,21 +837,15 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
             color: 'white', fontWeight: 'bold', cursor: 'pointer',
             letterSpacing: 3, fontFamily: 'Georgia, serif',
             boxShadow: '0 4px 24px rgba(245,158,11,0.5)',
-          }}>
-            ▶ JOGAR SOLO
-          </button>
+          }}>{tr.playSolo}</button>
           <button onClick={() => setView('online')} style={{
             width: '100%', padding: '14px 0', fontSize: 15, borderRadius: 50,
             border: '1px solid rgba(255,255,255,0.3)',
             background: 'rgba(255,255,255,0.08)',
             color: 'white', cursor: 'pointer',
             letterSpacing: 2, fontFamily: 'Georgia, serif',
-          }}>
-            🌐 JOGAR ONLINE
-          </button>
-          <div style={{ fontSize: 11, color: '#475569', textAlign: 'center', marginTop: 8 }}>
-            Solo: você + 3 robôs · Online: até 4 jogadores reais
-          </div>
+          }}>{tr.playOnline}</button>
+          <div style={{ fontSize: 11, color: '#475569', textAlign: 'center', marginTop: 8 }}>{tr.soloHint}</div>
         </div>
       )}
 
@@ -777,9 +856,9 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
             background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 16, padding: '24px 28px', flex: 1, minWidth: 240,
           }}>
-            <div style={{ fontSize: 12, color: '#fcd34d', letterSpacing: 2, marginBottom: 16 }}>CRIAR SALA</div>
+            <div style={{ fontSize: 12, color: '#fcd34d', letterSpacing: 2, marginBottom: 16 }}>{tr.createRoom}</div>
             <input
-              style={inputStyle} placeholder="O seu nome" value={name}
+              style={inputStyle} placeholder={tr.yourName} value={name}
               onChange={e => { setName(e.target.value); clearError(); }}
               onKeyDown={e => e.key === 'Enter' && handleCreate()}
             />
@@ -788,9 +867,7 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
               background: name.trim() ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(255,255,255,0.1)',
               color: 'white', fontWeight: 'bold', cursor: name.trim() ? 'pointer' : 'default',
               fontFamily: 'Georgia, serif', fontSize: 13, letterSpacing: 2,
-            }}>
-              {loading ? 'A ligar…' : '+ CRIAR SALA'}
-            </button>
+            }}>{loading ? tr.connecting : tr.createBtn}</button>
           </div>
 
           {/* Join room */}
@@ -798,9 +875,9 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
             background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 16, padding: '24px 28px', flex: 1, minWidth: 240,
           }}>
-            <div style={{ fontSize: 12, color: '#86efac', letterSpacing: 2, marginBottom: 16 }}>ENTRAR EM SALA</div>
+            <div style={{ fontSize: 12, color: '#86efac', letterSpacing: 2, marginBottom: 16 }}>{tr.joinRoom}</div>
             <input
-              style={{ ...inputStyle, marginBottom: 8 }} placeholder="O seu nome" value={name}
+              style={{ ...inputStyle, marginBottom: 8 }} placeholder={tr.yourName} value={name}
               onChange={e => { setName(e.target.value); clearError(); }}
             />
             <input
@@ -815,9 +892,7 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
               color: 'white', fontWeight: 'bold',
               cursor: (name.trim() && joinCode.trim()) ? 'pointer' : 'default',
               fontFamily: 'Georgia, serif', fontSize: 13, letterSpacing: 2,
-            }}>
-              {loading ? 'A ligar…' : '→ ENTRAR'}
-            </button>
+            }}>{loading ? tr.connecting : tr.joinBtn}</button>
           </div>
 
           {wsError && (
@@ -835,13 +910,13 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
           borderRadius: 16, padding: '24px 28px', width: '100%', maxWidth: 320,
         }}>
-          <div style={{ fontSize: 12, color: '#86efac', letterSpacing: 2, marginBottom: 4 }}>ENTRAR EM SALA</div>
+          <div style={{ fontSize: 12, color: '#86efac', letterSpacing: 2, marginBottom: 4 }}>{tr.joinRoom}</div>
           <div style={{ fontSize: 22, letterSpacing: 10, color: '#fcd34d', marginBottom: 16 }}>{urlRoom}</div>
           <input
             style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)',
               background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 14,
               fontFamily: 'Georgia, serif', outline: 'none', width: '100%' }}
-            placeholder="O seu nome" value={name}
+            placeholder={tr.yourName} value={name}
             onChange={e => { setName(e.target.value); clearError(); }}
             onKeyDown={e => e.key === 'Enter' && handleJoin()}
             autoFocus
@@ -854,13 +929,11 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
             background: name.trim() ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.1)',
             color: 'white', fontWeight: 'bold', cursor: name.trim() ? 'pointer' : 'default',
             fontFamily: 'Georgia, serif', fontSize: 14, letterSpacing: 2,
-          }}>
-            {loading ? 'A ligar…' : '→ ENTRAR'}
-          </button>
+          }}>{loading ? tr.connecting : tr.joinBtn}</button>
           <button onClick={() => setView('main')} style={{
             marginTop: 8, background: 'none', border: 'none', color: '#475569',
             cursor: 'pointer', fontSize: 12, fontFamily: 'Georgia, serif', width: '100%',
-          }}>← Voltar</button>
+          }}>{tr.back}</button>
         </div>
       )}
 
@@ -868,7 +941,7 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
         <button onClick={() => { setView('main'); clearError(); }} style={{
           marginTop: 20, background: 'none', border: 'none', color: '#475569',
           cursor: 'pointer', fontSize: 12, fontFamily: 'Georgia, serif',
-        }}>← Menu Principal</button>
+        }}>{tr.mainMenu}</button>
       )}
     </div>
   );
@@ -877,12 +950,13 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
 // ═══════════════════════════════════════════
 // ROUND END OVERLAY
 // ═══════════════════════════════════════════
-const RoundEnd = ({ roundPts, gamePts, perspective, players, onNewRound, onNewGame }) => {
+const RoundEnd = ({ roundPts, gamePts, perspective, players, onNewRound, onNewGame, lang }) => {
+  const tr = T[lang];
   const myTeam = TEAM[perspective];
   const myPts = roundPts[myTeam], theirPts = roundPts[1 - myTeam];
   const iWin = myPts >= 61;
   const partnerPos = (perspective + 2) % 4;
-  const getName = pos => players.find(p => p.position === pos)?.name || PNAME[pos];
+  const getName = pos => players.find(p => p.position === pos)?.name || tr.pname[pos];
   const myLabel = `${getName(perspective)} + ${getName(partnerPos)}`;
   const theirLabel = `${getName((perspective+1)%4)} + ${getName((perspective+3)%4)}`;
 
@@ -902,10 +976,10 @@ const RoundEnd = ({ roundPts, gamePts, perspective, players, onNewRound, onNewGa
       }}>
         <div style={{ fontSize: 'clamp(40px, 10vw, 64px)', marginBottom: 8 }}>{iWin ? '🎉' : '😔'}</div>
         <h2 style={{ fontSize: 'clamp(22px, 6vw, 32px)', margin: '0 0 4px', color: iWin ? '#86efac' : '#fca5a5' }}>
-          {iWin ? 'Vitória!' : 'Derrota!'}
+          {iWin ? tr.victory : tr.defeat}
         </h2>
         <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>
-          {iWin ? 'A vossa equipa ganhou esta rodada' : 'Os adversários ganharam esta rodada'}
+          {iWin ? tr.teamWon : tr.teamLost}
         </div>
         <div style={{ marginBottom: 24 }}>
           {[
@@ -924,22 +998,22 @@ const RoundEnd = ({ roundPts, gamePts, perspective, players, onNewRound, onNewGa
           ))}
         </div>
         <div style={{ padding: '12px 20px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, marginBottom: 24, fontSize: 13, color: '#94a3b8' }}>
-          Partidas ganhas —{' '}
-          <span style={{ color: '#86efac', fontWeight: 'bold' }}>Nós: {gamePts[myTeam]}</span>
+          {tr.gamesWon} —{' '}
+          <span style={{ color: '#86efac', fontWeight: 'bold' }}>{tr.us}: {gamePts[myTeam]}</span>
           {' | '}
-          <span style={{ color: '#fca5a5', fontWeight: 'bold' }}>Eles: {gamePts[1 - myTeam]}</span>
+          <span style={{ color: '#fca5a5', fontWeight: 'bold' }}>{tr.them}: {gamePts[1 - myTeam]}</span>
         </div>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button onClick={onNewRound} style={{
             padding: '12px 32px', fontSize: 15, borderRadius: 30, border: 'none',
             background: 'linear-gradient(135deg, #f59e0b, #d97706)',
             color: 'white', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Georgia, serif',
-          }}>Nova Rodada</button>
+          }}>{tr.newRound}</button>
           <button onClick={onNewGame} style={{
             padding: '12px 32px', fontSize: 15, borderRadius: 30,
             border: '1px solid rgba(255,255,255,0.2)',
             background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontFamily: 'Georgia, serif',
-          }}>Novo Jogo</button>
+          }}>{tr.newGame}</button>
         </div>
       </div>
     </div>
@@ -952,6 +1026,17 @@ const RoundEnd = ({ roundPts, gamePts, perspective, players, onNewRound, onNewGa
 export default function Sueca() {
   // ── Solo mode state ──
   const [localState, localDispatch] = useReducer(reduce, INIT);
+
+  // ── Language ──
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem('sueca_lang') || 'pt'; } catch { return 'pt'; }
+  });
+  const toggleLang = () => setLang(l => {
+    const next = l === 'pt' ? 'en' : 'pt';
+    try { localStorage.setItem('sueca_lang', next); } catch {}
+    return next;
+  });
+  const tr = T[lang];
 
   // ── Multiplayer state ──
   const wsRef = useRef(null);
@@ -1129,12 +1214,12 @@ export default function Sueca() {
           justifyContent: 'center', background: 'linear-gradient(135deg,#1e3a2f 0%,#14532d 60%,#052e16 100%)',
           color: '#fff', fontFamily: 'system-ui,sans-serif', gap: 20 }}>
           <div style={{ fontSize: 48 }}>🃏</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>A rejoin a sala…</div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>A reconnectar ao jogo</div>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>{tr.rejoiningMsg}</div>
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>{tr.reconnecting}</div>
           <button onClick={handleLeave}
             style={{ marginTop: 12, padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
               background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 14 }}>
-            Cancelar
+            {tr.cancel}
           </button>
         </div>
       );
@@ -1146,6 +1231,8 @@ export default function Sueca() {
         onJoinRoom={handleJoinRoom}
         wsError={wsError}
         clearError={() => setWsError('')}
+        lang={lang}
+        onToggleLang={toggleLang}
       />
     );
   }
@@ -1166,6 +1253,7 @@ export default function Sueca() {
         videoEnabled={rtc.videoEnabled}
         onToggleAudio={rtc.toggleAudio}
         onToggleVideo={rtc.toggleVideo}
+        lang={lang}
       />
     );
   }
@@ -1177,8 +1265,8 @@ export default function Sueca() {
   const myTeam = TEAM[perspective];
 
   const getName = pos => {
-    if (!multiMode) return pos === perspective ? 'Você' : PNAME[pos];
-    return players.find(p => p.position === pos)?.name || PNAME[pos];
+    if (!multiMode) return pos === perspective ? tr.you : tr.pname[pos];
+    return players.find(p => p.position === pos)?.name || tr.pname[pos];
   };
   const isHumanPlayer = pos => multiMode ? players.some(p => p.position === pos) : pos === 0;
   const isPlaying = pos => state.phase === 'playing' && state.current === pos;
@@ -1251,8 +1339,8 @@ export default function Sueca() {
         {/* Scores */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
           {[
-            { label: 'NÓS', pts: state.roundPts[myTeam], wins: state.gamePts[myTeam], color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
-            { label: 'ELES', pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+            { label: tr.US, pts: state.roundPts[myTeam], wins: state.gamePts[myTeam], color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
+            { label: tr.THEM, pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
           ].map(({ label, pts, wins, color, bg }, i) => (
             <div key={i} style={{ padding: `4px ${Math.max(8, Math.round(14 * Math.min(1, window.innerWidth / 600)))}px`, borderRadius: 12, background: bg, border: `1px solid ${color}44`, textAlign: 'center', minWidth: Math.max(50, Math.round(70 * Math.min(1, window.innerWidth / 600))) }}>
               <div style={{ fontSize: hdrLabel, color, letterSpacing: 2, marginBottom: 2 }}>{label}</div>
@@ -1273,7 +1361,7 @@ export default function Sueca() {
               background: RED[state.trump] ? 'rgba(220,38,38,0.2)' : 'rgba(30,41,59,0.6)',
               border: `1px solid ${RED[state.trump] ? '#dc2626' : '#64748b'}`,
             }}>
-              <div style={{ fontSize: 'clamp(7px, 1.5vw, 9px)', color: '#94a3b8', letterSpacing: 1 }}>TRUNFO</div>
+              <div style={{ fontSize: 'clamp(7px, 1.5vw, 9px)', color: '#94a3b8', letterSpacing: 1 }}>{tr.TRUMP}</div>
               <div style={{ fontSize: 'clamp(16px, 4vw, 22px)', color: RED[state.trump] ? '#f87171' : '#e2e8f0', fontWeight: 'bold', lineHeight: 1 }}>
                 {S[state.trump]}
               </div>
@@ -1293,7 +1381,7 @@ export default function Sueca() {
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <div style={{ ...badgeBase, background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.35)' }}>
-                  <div style={{ fontSize: 'clamp(6px, 1.2vw, 8px)', color: '#fbbf24', letterSpacing: 1 }}>DADOR</div>
+                  <div style={{ fontSize: 'clamp(6px, 1.2vw, 8px)', color: '#fbbf24', letterSpacing: 1 }}>{tr.DEALER}</div>
                   <div style={{ fontSize: 'clamp(8px, 1.8vw, 11px)', color: '#fde68a', fontWeight: 'bold', lineHeight: 1.2, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {dealerName}
                   </div>
@@ -1303,7 +1391,7 @@ export default function Sueca() {
                     background: isMyTurn ? 'rgba(34,197,94,0.2)' : 'rgba(148,163,184,0.1)',
                     border: `1px solid ${isMyTurn ? 'rgba(34,197,94,0.6)' : 'rgba(148,163,184,0.2)'}`,
                   }}>
-                    <div style={{ fontSize: 'clamp(6px, 1.2vw, 8px)', color: isMyTurn ? '#4ade80' : '#94a3b8', letterSpacing: 1 }}>VEZ</div>
+                    <div style={{ fontSize: 'clamp(6px, 1.2vw, 8px)', color: isMyTurn ? '#4ade80' : '#94a3b8', letterSpacing: 1 }}>{tr.NEXT}</div>
                     <div style={{ fontSize: 'clamp(8px, 1.8vw, 11px)', color: isMyTurn ? '#86efac' : '#cbd5e1', fontWeight: 'bold', lineHeight: 1.2, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {nextName}
                     </div>
@@ -1314,11 +1402,11 @@ export default function Sueca() {
           })()}
 
           <div style={{ fontSize: 'clamp(8px, 2vw, 10px)', color: '#64748b', textAlign: 'right', lineHeight: 1.6 }}>
-            {state.tricksLeft}<br />vazas
+            {state.tricksLeft}<br />{tr.tricks}
           </div>
           {multiMode && (
             <div style={{ fontSize: 'clamp(8px, 2vw, 10px)', color: '#475569', borderLeft: '1px solid #1e293b', paddingLeft: 8 }}>
-              Sala<br /><span style={{ color: '#fcd34d', fontWeight: 'bold', letterSpacing: 2 }}>{roomId}</span>
+              {tr.room}<br /><span style={{ color: '#fcd34d', fontWeight: 'bold', letterSpacing: 2 }}>{roomId}</span>
             </div>
           )}
         </div>
@@ -1338,7 +1426,7 @@ export default function Sueca() {
           <div style={{ position: 'absolute', zIndex: 20, pointerEvents: 'none', ...trumpPos }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
               <div style={{ fontSize: Math.max(7, Math.round(9 * scale)), color: '#fcd34d', letterSpacing: 1, textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                trunfo
+                {tr.trumpLabel}
               </div>
               <Card card={state.trumpCard} small scale={scale} />
             </div>
@@ -1447,6 +1535,7 @@ export default function Sueca() {
           players={players}
           onNewRound={() => dispatch({ type: 'NEW_ROUND' })}
           onNewGame={() => dispatch({ type: 'START' })}
+          lang={lang}
         />
       )}
 
