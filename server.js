@@ -99,6 +99,21 @@ wss.on('connection', (ws) => {
       broadcast(room);
     }
 
+    else if (msg.type === 'CHANGE_SEAT') {
+      const room = rooms.get(myRoomId);
+      if (!room || room.state.phase !== 'welcome') return;
+      const toPos = msg.toPosition;
+      if (typeof toPos !== 'number' || toPos < 0 || toPos > 3) return;
+      // Check seat isn't already taken
+      if (room.players.some(p => p.position === toPos)) return;
+      room.players = room.players.map(p =>
+        p.position === myPosition ? { ...p, position: toPos } : p
+      );
+      myPosition = toPos;
+      send({ type: 'SEAT_CHANGED', position: toPos });
+      broadcast(room);
+    }
+
     else if (msg.type === 'JOIN_ROOM') {
       const roomId = msg.roomId?.toUpperCase().trim();
       const room = rooms.get(roomId);

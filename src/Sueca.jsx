@@ -255,107 +255,153 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1 }) => {
 // ═══════════════════════════════════════════
 // LOBBY SCREEN
 // ═══════════════════════════════════════════
-const Lobby = ({ roomId, players, myPosition, onStart, onLeave }) => {
+const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat }) => {
   const gameUrl = `${window.location.origin}/?room=${roomId}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(gameUrl)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(gameUrl)}`;
   const [copied, setCopied] = useState(false);
-  const seatNames = ['Sul ↓', 'Oeste ←', 'Norte ↑', 'Este →'];
 
   const copyLink = () => {
     navigator.clipboard.writeText(gameUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   };
+
+  // Seat metadata: position → { label, icon, teamColor, teamLabel }
+  const seats = [
+    { pos: 0, label: 'Sul',   dir: '↓', team: 0, teamName: 'Equipa A', teamColor: '#60a5fa' },
+    { pos: 1, label: 'Oeste', dir: '←', team: 1, teamName: 'Equipa B', teamColor: '#f472b6' },
+    { pos: 2, label: 'Norte', dir: '↑', team: 0, teamName: 'Equipa A', teamColor: '#60a5fa' },
+    { pos: 3, label: 'Este',  dir: '→', team: 1, teamName: 'Equipa B', teamColor: '#f472b6' },
+  ];
+
+  // Group by team for display
+  const teamA = seats.filter(s => s.team === 0); // Sul + Norte
+  const teamB = seats.filter(s => s.team === 1); // Oeste + Este
+
+  const SeatCard = ({ seat }) => {
+    const occupant = players.find(p => p.position === seat.pos);
+    const isMe = seat.pos === myPosition;
+    const isEmpty = !occupant;
+    const canSit = isEmpty && !isMe;
+
+    return (
+      <div
+        onClick={() => canSit && onChangeSeat(seat.pos)}
+        style={{
+          padding: '10px 14px', borderRadius: 12,
+          background: isMe
+            ? `rgba(${seat.team === 0 ? '96,165,250' : '244,114,182'},0.2)`
+            : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${isMe ? seat.teamColor : 'rgba(255,255,255,0.1)'}`,
+          cursor: canSit ? 'pointer' : 'default',
+          transition: 'all 0.2s',
+          minWidth: 130,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 11, color: seat.teamColor, fontWeight: 'bold' }}>
+            {seat.label} {seat.dir}
+          </span>
+          {isMe && <span style={{ fontSize: 9, color: '#fcd34d', letterSpacing: 1 }}>VOCÊ</span>}
+          {occupant && !isMe && (
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: occupant.connected ? '#22c55e' : '#475569' }} />
+          )}
+        </div>
+        {occupant ? (
+          <div style={{ fontSize: 13, color: 'white', fontWeight: isMe ? 'bold' : 'normal' }}>
+            {occupant.name}
+          </div>
+        ) : (
+          <div style={{
+            fontSize: 12, color: '#475569',
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}>
+            {canSit ? <span style={{ color: '#64748b' }}>+ Sentar aqui</span> : <span>Aguardando…</span>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const TeamColumn = ({ seats: teamSeats, label, color }) => (
+    <div style={{
+      background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}33`,
+      borderRadius: 16, padding: '14px 16px', flex: 1, minWidth: 150,
+    }}>
+      <div style={{ fontSize: 10, color, letterSpacing: 2, marginBottom: 10, textAlign: 'center' }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {teamSeats.map(seat => <SeatCard key={seat.pos} seat={seat} />)}
+      </div>
+    </div>
+  );
 
   return (
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(160deg, #0c1445 0%, #1a237e 40%, #0d47a1 70%, #0c2461 100%)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'Georgia, serif', color: 'white', padding: 24, gap: 28,
+      fontFamily: 'Georgia, serif', color: 'white', padding: 20, gap: 20,
     }}>
+      {/* Room code */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 11, letterSpacing: 6, color: '#90caf9', marginBottom: 6 }}>SALA DE JOGO</div>
+        <div style={{ fontSize: 11, letterSpacing: 6, color: '#90caf9', marginBottom: 4 }}>SALA DE JOGO</div>
         <div style={{
-          fontSize: 'clamp(40px, 10vw, 64px)', fontWeight: 'bold', letterSpacing: 16,
+          fontSize: 'clamp(40px, 10vw, 60px)', fontWeight: 'bold', letterSpacing: 14,
           background: 'linear-gradient(135deg, #fcd34d, #f59e0b)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
         }}>{roomId}</div>
-        <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Código da sala</div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
-        {/* QR Code */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          <img src={qrUrl} alt="QR Code" style={{ borderRadius: 12, border: '3px solid rgba(255,255,255,0.15)', width: 'min(160px, 40vw)', height: 'min(160px, 40vw)' }} />
-          <div style={{ fontSize: 11, color: '#64748b' }}>Digitalizar para entrar</div>
-        </div>
-
-        {/* Players list */}
-        <div style={{
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 16, padding: '20px 28px', minWidth: 220,
-        }}>
-          <div style={{ fontSize: 11, color: '#fcd34d', letterSpacing: 2, marginBottom: 14 }}>JOGADORES</div>
-          {[0, 1, 2, 3].map(pos => {
-            const player = players.find(p => p.position === pos);
-            const isMe = pos === myPosition;
-            return (
-              <div key={pos} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '8px 0', borderBottom: pos < 3 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-              }}>
-                <div style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: player?.connected ? '#22c55e' : '#334155',
-                }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: player ? 'white' : '#475569' }}>
-                    {player ? player.name : 'Aguardando…'}
-                    {isMe && <span style={{ fontSize: 10, color: '#fcd34d', marginLeft: 6 }}>(você)</span>}
-                  </div>
-                  <div style={{ fontSize: 10, color: '#475569' }}>
-                    {seatNames[pos]}
-                    {TEAM[pos] === 0 ? ' · Equipa A' : ' · Equipa B'}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          <div style={{ marginTop: 12, fontSize: 11, color: '#475569' }}>
-            Equipas: Sul+Norte vs Oeste+Este
-          </div>
+        <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
+          Escolhe o teu lugar · Equipas: Sul+Norte vs Oeste+Este
         </div>
       </div>
 
-      {/* Link & buttons */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%', maxWidth: 400 }}>
-        <div style={{
-          background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 10, padding: '8px 16px', fontSize: 11, color: '#64748b',
-          wordBreak: 'break-all', textAlign: 'center',
-        }}>{gameUrl}</div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+      {/* Teams side by side */}
+      <div style={{ display: 'flex', gap: 12, width: '100%', maxWidth: 520, alignItems: 'stretch' }}>
+        <TeamColumn seats={teamA} label="EQUIPA A" color="#60a5fa" />
+        <TeamColumn seats={teamB} label="EQUIPA B" color="#f472b6" />
+      </div>
+
+      {/* QR + link row */}
+      <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+          <img src={qrUrl} alt="QR Code" style={{ borderRadius: 10, border: '2px solid rgba(255,255,255,0.12)', width: 'min(120px, 30vw)', height: 'min(120px, 30vw)' }} />
+          <div style={{ fontSize: 10, color: '#475569' }}>Digitalizar para entrar</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+          <div style={{
+            background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 8, padding: '6px 12px', fontSize: 10, color: '#64748b',
+            wordBreak: 'break-all', textAlign: 'center', maxWidth: 240,
+          }}>{gameUrl}</div>
           <button onClick={copyLink} style={{
-            padding: '10px 24px', borderRadius: 30, border: '1px solid rgba(255,255,255,0.2)',
+            padding: '8px 20px', borderRadius: 30, border: '1px solid rgba(255,255,255,0.2)',
             background: copied ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)',
-            color: copied ? '#86efac' : 'white', cursor: 'pointer', fontSize: 13,
+            color: copied ? '#86efac' : 'white', cursor: 'pointer', fontSize: 12,
             fontFamily: 'Georgia, serif',
           }}>
             {copied ? '✓ Copiado!' : '🔗 Copiar Link'}
           </button>
-          <button onClick={onStart} style={{
-            padding: '10px 32px', borderRadius: 30, border: 'none',
-            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-            color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: 13,
-            fontFamily: 'Georgia, serif', letterSpacing: 2,
-          }}>
-            ▶ INICIAR
-          </button>
         </div>
-        <button onClick={onLeave} style={{
-          background: 'none', border: 'none', color: '#475569',
-          cursor: 'pointer', fontSize: 12, fontFamily: 'Georgia, serif',
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <button onClick={onStart} style={{
+          padding: '12px 36px', borderRadius: 30, border: 'none',
+          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+          color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: 14,
+          fontFamily: 'Georgia, serif', letterSpacing: 2,
+          boxShadow: '0 4px 20px rgba(245,158,11,0.4)',
         }}>
-          ← Sair da sala
+          ▶ INICIAR JOGO
+        </button>
+        <button onClick={onLeave} style={{
+          padding: '12px 24px', borderRadius: 30,
+          border: '1px solid rgba(255,255,255,0.15)',
+          background: 'rgba(255,255,255,0.05)',
+          color: '#94a3b8', cursor: 'pointer', fontSize: 13, fontFamily: 'Georgia, serif',
+        }}>
+          ← Sair
         </button>
       </div>
     </div>
@@ -679,6 +725,8 @@ export default function Sueca() {
       } else if (msg.type === 'JOINED') {
         setMyPosition(msg.position); setRoomId(msg.roomId);
         setMultiMode(true); setAppView('lobby');
+      } else if (msg.type === 'SEAT_CHANGED') {
+        setMyPosition(msg.position);
       } else if (msg.type === 'STATE_UPDATE') {
         setWsState(msg.state); setPlayers(msg.players);
         if (msg.state.phase !== 'welcome') setAppView('game');
@@ -741,6 +789,7 @@ export default function Sueca() {
         myPosition={myPosition}
         onStart={() => wsRef.current?.send(JSON.stringify({ type: 'GAME_ACTION', action: { type: 'START' } }))}
         onLeave={handleLeave}
+        onChangeSeat={pos => wsRef.current?.send(JSON.stringify({ type: 'CHANGE_SEAT', toPosition: pos }))}
       />
     );
   }
