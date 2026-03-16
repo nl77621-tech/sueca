@@ -1,204 +1,5 @@
-import { useReducer, useEffect, useRef, useState } from "react";
-
-// ═══════════════════════════════════════════
-// CONSTANTS
-// ═══════════════════════════════════════════
-const S = ['♠', '♥', '♦', '♣'];
-const RED = [false, true, true, false];
-const V = ['A', '2', '3', '4', '5', '6', '7', 'J', 'Q', 'K'];
-const PTS = { A: 11, '7': 10, K: 4, J: 3, Q: 2, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0 };
-const RNK = { A: 9, '7': 8, K: 7, J: 6, Q: 5, '6': 4, '5': 3, '4': 2, '3': 1, '2': 0 };
-const TEAM = [0, 1, 0, 1];
-const PNAME = ['Você', 'Oeste', 'Norte', 'Este'];
-
-// ═══════════════════════════════════════════
-// PURE HELPERS
-// ═══════════════════════════════════════════
-const mkDeck = () =>
-  S.flatMap((s, si) => V.map(v => ({ s, si, v, id: `${v}${s}`, p: PTS[v] || 0 })));
-
-const shuf = arr => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-const cRnk = (c, t, l) =>
-  c.si === t ? 200 + RNK[c.v] : c.si === l ? 100 + RNK[c.v] : RNK[c.v];
-
-const trickWinner = (trick, t) => {
-  const l = trick[0].card.si;
-  let b = 0;
-  for (let i = 1; i < trick.length; i++)
-    if (cRnk(trick[i].card, t, l) > cRnk(trick[b].card, t, l)) b = i;
-  return trick[b].player;
-};
-
-const validCards = (hand, trick, t) => {
-  if (!trick.length) return hand;
-  const l = trick[0].card.si;
-  const f = hand.filter(c => c.si === l);
-  return f.length ? f : hand;
-};
-
-// ═══════════════════════════════════════════
-// AI LOGIC
-// ═══════════════════════════════════════════
-const aiPick = (hand, trick, t, me) => {
-  const v = validCards(hand, trick, t);
-  if (!v.length) return null;
-
-  if (!trick.length) {
-    // Leading: play highest non-trump card (prefer aces and 7s)
-    const nt = v.filter(c => c.si !== t);
-    const pool = nt.length ? nt : v;
-    return pool.reduce((b, c) => RNK[c.v] > RNK[b.v] ? c : b, pool[0]);
-  }
-
-  const l = trick[0].card.si;
-  let bi = 0;
-  for (let i = 1; i < trick.length; i++)
-    if (cRnk(trick[i].card, t, l) > cRnk(trick[bi].card, t, l)) bi = i;
-
-  const partnerWins = TEAM[trick[bi].player] === TEAM[me];
-  const beats = v.filter(c => cRnk(c, t, l) > cRnk(trick[bi].card, t, l));
-
-  if (beats.length && !partnerWins) {
-    // Win with minimum card needed
-    return beats.reduce((b, c) => cRnk(c, t, l) < cRnk(b, t, l) ? c : b, beats[0]);
-  }
-
-  if (partnerWins && trick.length === 3) {
-    // Partner wins, last to play: dump highest-point non-trump
-    const pts = v.filter(c => c.p > 0 && c.si !== t);
-    if (pts.length) return pts.reduce((b, c) => c.p > b.p ? c : b, pts[0]);
-  }
-
-  // Dump lowest-value card
-  return v.reduce((b, c) => (c.p < b.p || (c.p === b.p && RNK[c.v] < RNK[b.v])) ? c : b, v[0]);
-};
-
-// ═══════════════════════════════════════════
-// GAME REDUCER
-// ═══════════════════════════════════════════
-const deal = dealer => {
-  const deck = shuf(mkDeck());
-  const tc = deck[39]; // last card is always the trump card
-  // rawHands[3] always contains tc; rotate so dealer gets rawHands[3]
-  const rawHands = [deck.slice(0, 10), deck.slice(10, 20), deck.slice(20, 30), deck.slice(30, 40)];
-  const hands = Array(4).fill(null).map((_, i) => {
-    if (i === dealer) return rawHands[3];
-    const idx = i < dealer ? i : i - 1;
-    return rawHands[idx];
-  });
-  const first = (dealer + 1) % 4;
-  return { hands, trump: tc.si, trumpCard: tc, current: first, leader: first };
-};
-
-const INIT = {
-  phase: 'welcome',
-  hands: [[], [], [], []],
-  trump: null, trumpCard: null,
-  trick: [], trickWinner: null,
-  current: 0, leader: 0, dealer: 0,
-  roundPts: [0, 0], gamePts: [0, 0],
-  tricksLeft: 10, msg: '', sel: null,
-};
-
-const reduce = (state, action) => {
-  switch (action.type) {
-    case 'START': {
-      const dealer = Math.floor(Math.random() * 4);
-      const { hands, trump, trumpCard, current, leader } = deal(dealer);
-      return {
-        ...INIT, phase: 'playing', hands, trump, trumpCard, current, leader, dealer,
-        msg: `Trunfo: ${S[trump]} ${current === 0 ? '— Sua vez!' : '— Vez de ' + PNAME[current]}`
-      };
-    }
-    case 'NEW_ROUND': {
-      const dealer = (state.dealer + 1) % 4;
-      const { hands, trump, trumpCard, current, leader } = deal(dealer);
-      return {
-        ...state, phase: 'playing', hands, trump, trumpCard, current, leader, dealer,
-        trick: [], trickWinner: null, roundPts: [0, 0], tricksLeft: 10, sel: null,
-        msg: `Nova rodada! Trunfo: ${S[trump]}`
-      };
-    }
-    case 'SEL': {
-      if (state.phase !== 'playing' || state.current !== 0) return state;
-      const vd = validCards(state.hands[0], state.trick, state.trump);
-      if (!vd.some(c => c.id === action.card.id)) return state;
-      return { ...state, sel: state.sel?.id === action.card.id ? null : action.card };
-    }
-    case 'PLAY': {
-      const { pi, card } = action;
-      if (state.phase !== 'playing' || state.current !== pi) return state;
-      const vd = validCards(state.hands[pi], state.trick, state.trump);
-      if (!vd.some(c => c.id === card.id)) return state;
-
-      const newH = state.hands.map((h, i) => i === pi ? h.filter(c => c.id !== card.id) : h);
-      const newT = [...state.trick, { player: pi, card }];
-
-      if (newT.length < 4) {
-        const nxt = (pi + 1) % 4;
-        return {
-          ...state, hands: newH, trick: newT, current: nxt, sel: null,
-          msg: nxt === 0 ? '✨ Sua vez!' : `Vez de ${PNAME[nxt]}…`
-        };
-      }
-
-      // Trick complete
-      const w = trickWinner(newT, state.trump);
-      const tp = newT.reduce((s, { card: c }) => s + c.p, 0);
-      const rp = [...state.roundPts]; rp[TEAM[w]] += tp;
-      const tl = state.tricksLeft - 1;
-
-      if (tl === 0) {
-        const aWins = rp[0] >= 61;
-        const gp = [...state.gamePts]; gp[aWins ? 0 : 1]++;
-        return {
-          ...state, hands: newH, trick: newT, trickWinner: w,
-          roundPts: rp, gamePts: gp, tricksLeft: 0, sel: null, phase: 'round_end',
-          msg: `Rodada terminada! Nós: ${rp[0]} | Eles: ${rp[1]}`
-        };
-      }
-
-      return {
-        ...state, hands: newH, trick: newT, trickWinner: w,
-        roundPts: rp, tricksLeft: tl, sel: null, phase: 'resolving',
-        msg: `${PNAME[w]} venceu a vaza!${tp > 0 ? ` (+${tp} pts)` : ''}`
-      };
-    }
-    case 'CLEAR':
-      if (state.phase !== 'resolving') return state;
-      return {
-        ...state, trick: [], trickWinner: null,
-        current: state.trickWinner, leader: state.trickWinner,
-        phase: 'playing', sel: null,
-        msg: state.trickWinner === 0 ? '✨ Você lidera! Escolha uma carta.' : `${PNAME[state.trickWinner]} lidera…`
-      };
-    case 'REORDER_HAND': {
-      const { from, to } = action;
-      const hand = [...state.hands[0]];
-      const [moved] = hand.splice(from, 1);
-      hand.splice(to, 0, moved);
-      return { ...state, hands: state.hands.map((h, i) => i === 0 ? hand : h) };
-    }
-    case 'AUTO_ORDER_HAND': {
-      const t = state.trump;
-      const hand = [...state.hands[0]];
-      const trumps = hand.filter(c => c.si === t).sort((a, b) => RNK[b.v] - RNK[a.v]);
-      const others = hand.filter(c => c.si !== t)
-        .sort((a, b) => a.si !== b.si ? a.si - b.si : RNK[b.v] - RNK[a.v]);
-      const sorted = [...trumps, ...others];
-      return { ...state, hands: state.hands.map((h, i) => i === 0 ? sorted : h) };
-    }
-    default: return state;
-  }
-};
+import { useReducer, useEffect, useRef, useState, useCallback } from "react";
+import { S, RED, RNK, TEAM, PNAME, reduce, aiPick, validCards, INIT } from "./gameLogic.js";
 
 // ═══════════════════════════════════════════
 // CARD COMPONENTS
@@ -215,9 +16,7 @@ const Card = ({ card, onClick, hilite, sel, small }) => {
       padding: small ? '3px 4px' : '7px 8px',
       boxShadow: sel
         ? '0 0 0 3px #f59e0b88, 0 8px 20px rgba(0,0,0,0.4)'
-        : hilite
-          ? '0 4px 12px rgba(34,197,94,0.3)'
-          : '0 2px 8px rgba(0,0,0,0.25)',
+        : hilite ? '0 4px 12px rgba(34,197,94,0.3)' : '0 2px 8px rgba(0,0,0,0.25)',
       transform: sel ? 'translateY(-14px)' : 'none',
       transition: 'all 0.18s cubic-bezier(.4,0,.2,1)',
       cursor: hilite ? 'pointer' : 'default',
@@ -229,10 +28,7 @@ const Card = ({ card, onClick, hilite, sel, small }) => {
         {card.v}<br />{card.s}
       </div>
       <div style={{ fontSize: small ? 26 : 40, textAlign: 'center', lineHeight: 1 }}>{card.s}</div>
-      <div style={{
-        fontSize: small ? 13 : 18, lineHeight: 1.15,
-        alignSelf: 'flex-end', transform: 'rotate(180deg)',
-      }}>
+      <div style={{ fontSize: small ? 13 : 18, lineHeight: 1.15, alignSelf: 'flex-end', transform: 'rotate(180deg)' }}>
         {card.v}<br />{card.s}
       </div>
     </div>
@@ -252,10 +48,8 @@ const CardBack = ({ small, rotated }) => {
       <div style={{
         position: 'absolute', inset: 4, borderRadius: 4,
         border: '1px solid rgba(255,255,255,0.25)',
-        background: `repeating-linear-gradient(
-          45deg, transparent, transparent 4px,
-          rgba(255,255,255,0.06) 4px, rgba(255,255,255,0.06) 8px
-        )`,
+        background: `repeating-linear-gradient(45deg, transparent, transparent 4px,
+          rgba(255,255,255,0.06) 4px, rgba(255,255,255,0.06) 8px)`,
       }} />
       <div style={{
         position: 'absolute', inset: 0,
@@ -272,17 +66,13 @@ const CardBack = ({ small, rotated }) => {
 // ═══════════════════════════════════════════
 const NorthHand = ({ count }) => {
   const n = Math.min(count, 10);
-  const spread = 20;
-  const totalW = n > 1 ? (n - 1) * spread + 42 : 42;
+  const spread = 20, totalW = n > 1 ? (n - 1) * spread + 42 : 42;
   return (
     <div style={{ position: 'relative', width: totalW, height: 70 }}>
       {Array(n).fill(0).map((_, i) => (
         <div key={i} style={{
-          position: 'absolute',
-          left: i * spread,
-          bottom: 0,
-          transform: `rotate(${(i - (n - 1) / 2) * 3}deg)`,
-          transformOrigin: 'bottom center',
+          position: 'absolute', left: i * spread, bottom: 0,
+          transform: `rotate(${(i - (n - 1) / 2) * 3}deg)`, transformOrigin: 'bottom center',
         }}>
           <CardBack small />
         </div>
@@ -293,17 +83,14 @@ const NorthHand = ({ count }) => {
 
 const SideHand = ({ count, side }) => {
   const n = Math.min(count, 10);
-  const spread = 14;
-  const totalH = n > 1 ? (n - 1) * spread + 42 : 42;
+  const spread = 14, totalH = n > 1 ? (n - 1) * spread + 42 : 42;
   return (
     <div style={{ position: 'relative', height: totalH, width: 70 }}>
       {Array(n).fill(0).map((_, i) => (
         <div key={i} style={{
-          position: 'absolute',
-          top: i * spread,
-          left: side === 'left' ? 'auto' : 0,
-          right: side === 'left' ? 0 : 'auto',
-          transform: `rotate(${side === 'left' ? -90 : 90}deg) rotate(${(i - (n - 1) / 2) * 3}deg)`,
+          position: 'absolute', top: i * spread,
+          [side === 'left' ? 'right' : 'left']: 0,
+          transform: `rotate(${side === 'left' ? -90 : 90}deg)`,
           transformOrigin: 'center center',
         }}>
           <CardBack small rotated />
@@ -313,10 +100,12 @@ const SideHand = ({ count, side }) => {
   );
 };
 
+// ═══════════════════════════════════════════
+// PLAYER HAND (drag-to-reorder)
+// ═══════════════════════════════════════════
 const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder }) => {
   const vd = new Set(validCards(hand, trick, trump).map(c => c.id));
-  const spread = 52;
-  const n = hand.length;
+  const spread = 52, n = hand.length;
   const totalW = n > 1 ? (n - 1) * spread + 64 : 64;
   const dragIdx = useRef(null);
   const [overIdx, setOverIdx] = useState(null);
@@ -332,48 +121,29 @@ const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder }) => {
           <div
             key={card.id}
             draggable
-            onDragStart={e => {
-              dragIdx.current = i;
-              e.dataTransfer.effectAllowed = 'move';
-            }}
-            onDragOver={e => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              if (overIdx !== i) setOverIdx(i);
-            }}
+            onDragStart={e => { dragIdx.current = i; e.dataTransfer.effectAllowed = 'move'; }}
+            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overIdx !== i) setOverIdx(i); }}
             onDragLeave={() => setOverIdx(null)}
             onDrop={e => {
               e.preventDefault();
-              if (dragIdx.current !== null && dragIdx.current !== i) {
-                onReorder(dragIdx.current, i);
-              }
-              dragIdx.current = null;
-              setOverIdx(null);
+              if (dragIdx.current !== null && dragIdx.current !== i) onReorder(dragIdx.current, i);
+              dragIdx.current = null; setOverIdx(null);
             }}
-            onDragEnd={() => {
-              dragIdx.current = null;
-              setOverIdx(null);
-            }}
+            onDragEnd={() => { dragIdx.current = null; setOverIdx(null); }}
             style={{
-              position: 'absolute',
-              left: xPos,
-              bottom: 0,
+              position: 'absolute', left: xPos, bottom: 0,
               transform: `rotate(${(i - (n - 1) / 2) * 2.5}deg) ${isOver ? 'translateY(-14px)' : ''}`,
               transformOrigin: 'bottom center',
               zIndex: isSel ? 20 : isOver ? 15 : i,
               transition: 'left 0.3s ease, transform 0.15s ease, opacity 0.15s',
-              cursor: 'grab',
-              opacity: dragIdx.current === i ? 0.45 : 1,
+              cursor: 'grab', opacity: dragIdx.current === i ? 0.45 : 1,
             }}
           >
             <Card
-              card={card}
-              hilite={isHilite}
-              sel={isSel}
+              card={card} hilite={isHilite} sel={isSel}
               onClick={() => {
                 if (!isHilite) return;
-                if (isSel) onPlay(card);
-                else onSel(card);
+                if (isSel) onPlay(card); else onSel(card);
               }}
             />
           </div>
@@ -384,16 +154,16 @@ const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder }) => {
 };
 
 // ═══════════════════════════════════════════
-// TRICK AREA
+// TRICK AREA (perspective-aware)
 // ═══════════════════════════════════════════
-const TrickArea = ({ trick, trickWinner }) => {
+const TrickArea = ({ trick, trickWinner, perspective = 0 }) => {
+  const p = perspective;
   const positions = {
-    0: { gridRow: 3, gridColumn: 2, label: 'Você' },
-    2: { gridRow: 1, gridColumn: 2, label: 'Norte' },
-    1: { gridRow: 2, gridColumn: 1, label: 'Oeste' },
-    3: { gridRow: 2, gridColumn: 3, label: 'Este' },
+    [p]:        { gridRow: 3, gridColumn: 2 },
+    [(p+1)%4]:  { gridRow: 2, gridColumn: 1 },
+    [(p+2)%4]:  { gridRow: 1, gridColumn: 2 },
+    [(p+3)%4]:  { gridRow: 2, gridColumn: 3 },
   };
-
   return (
     <div style={{
       display: 'grid',
@@ -412,10 +182,7 @@ const TrickArea = ({ trick, trickWinner }) => {
             alignItems: 'center', justifyContent: 'center', gap: 2,
           }}>
             {play ? (
-              <div style={{
-                position: 'relative',
-                animation: 'cardSlide 0.3s cubic-bezier(.4,0,.2,1)',
-              }}>
+              <div style={{ position: 'relative', animation: 'cardSlide 0.3s cubic-bezier(.4,0,.2,1)' }}>
                 <Card card={play.card} />
                 {isWinner && (
                   <div style={{
@@ -427,14 +194,12 @@ const TrickArea = ({ trick, trickWinner }) => {
             ) : (
               <div style={{
                 width: 96, height: 134, borderRadius: 8,
-                border: '2px dashed rgba(255,255,255,0.15)',
-                opacity: 0.5,
+                border: '2px dashed rgba(255,255,255,0.15)', opacity: 0.5,
               }} />
             )}
           </div>
         );
       })}
-      {/* Center decoration */}
       <div style={{
         gridRow: 2, gridColumn: 2,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -445,128 +210,313 @@ const TrickArea = ({ trick, trickWinner }) => {
 };
 
 // ═══════════════════════════════════════════
-// TRUMP BADGE
+// LOBBY SCREEN
 // ═══════════════════════════════════════════
-const TrumpBadge = ({ trump, trumpCard }) => (
-  <div style={{
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-  }}>
-    <div style={{ fontSize: 10, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase' }}>Trunfo</div>
+const Lobby = ({ roomId, players, myPosition, onStart, onLeave }) => {
+  const gameUrl = `${window.location.origin}/?room=${roomId}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(gameUrl)}`;
+  const [copied, setCopied] = useState(false);
+  const seatNames = ['Sul ↓', 'Oeste ←', 'Norte ↑', 'Este →'];
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(gameUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  };
+
+  return (
     <div style={{
-      padding: '4px 10px', borderRadius: 12,
-      background: RED[trump] ? 'rgba(220,38,38,0.2)' : 'rgba(30,41,59,0.6)',
-      border: `1px solid ${RED[trump] ? '#dc2626' : '#64748b'}`,
-      color: RED[trump] ? '#f87171' : '#e2e8f0',
-      fontSize: 20, fontWeight: 'bold',
+      minHeight: '100vh',
+      background: 'linear-gradient(160deg, #0c1445 0%, #1a237e 40%, #0d47a1 70%, #0c2461 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Georgia, serif', color: 'white', padding: 24, gap: 28,
     }}>
-      {S[trump]}
-    </div>
-    {trumpCard && (
-      <div style={{ marginTop: 4 }}>
-        <Card card={trumpCard} small />
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 11, letterSpacing: 6, color: '#90caf9', marginBottom: 6 }}>SALA DE JOGO</div>
+        <div style={{
+          fontSize: 64, fontWeight: 'bold', letterSpacing: 16,
+          background: 'linear-gradient(135deg, #fcd34d, #f59e0b)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+        }}>{roomId}</div>
+        <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Código da sala</div>
       </div>
-    )}
-  </div>
-);
+
+      <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {/* QR Code */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+          <img src={qrUrl} alt="QR Code" style={{ borderRadius: 12, border: '3px solid rgba(255,255,255,0.15)' }} />
+          <div style={{ fontSize: 11, color: '#64748b' }}>Digitalizar para entrar</div>
+        </div>
+
+        {/* Players list */}
+        <div style={{
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 16, padding: '20px 28px', minWidth: 220,
+        }}>
+          <div style={{ fontSize: 11, color: '#fcd34d', letterSpacing: 2, marginBottom: 14 }}>JOGADORES</div>
+          {[0, 1, 2, 3].map(pos => {
+            const player = players.find(p => p.position === pos);
+            const isMe = pos === myPosition;
+            return (
+              <div key={pos} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 0', borderBottom: pos < 3 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: player?.connected ? '#22c55e' : '#334155',
+                }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: player ? 'white' : '#475569' }}>
+                    {player ? player.name : 'Aguardando…'}
+                    {isMe && <span style={{ fontSize: 10, color: '#fcd34d', marginLeft: 6 }}>(você)</span>}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#475569' }}>
+                    {seatNames[pos]}
+                    {TEAM[pos] === 0 ? ' · Equipa A' : ' · Equipa B'}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ marginTop: 12, fontSize: 11, color: '#475569' }}>
+            Equipas: Sul+Norte vs Oeste+Este
+          </div>
+        </div>
+      </div>
+
+      {/* Link & buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%', maxWidth: 400 }}>
+        <div style={{
+          background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 10, padding: '8px 16px', fontSize: 11, color: '#64748b',
+          wordBreak: 'break-all', textAlign: 'center',
+        }}>{gameUrl}</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={copyLink} style={{
+            padding: '10px 24px', borderRadius: 30, border: '1px solid rgba(255,255,255,0.2)',
+            background: copied ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)',
+            color: copied ? '#86efac' : 'white', cursor: 'pointer', fontSize: 13,
+            fontFamily: 'Georgia, serif',
+          }}>
+            {copied ? '✓ Copiado!' : '🔗 Copiar Link'}
+          </button>
+          <button onClick={onStart} style={{
+            padding: '10px 32px', borderRadius: 30, border: 'none',
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: 13,
+            fontFamily: 'Georgia, serif', letterSpacing: 2,
+          }}>
+            ▶ INICIAR
+          </button>
+        </div>
+        <button onClick={onLeave} style={{
+          background: 'none', border: 'none', color: '#475569',
+          cursor: 'pointer', fontSize: 12, fontFamily: 'Georgia, serif',
+        }}>
+          ← Sair da sala
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // ═══════════════════════════════════════════
 // WELCOME SCREEN
 // ═══════════════════════════════════════════
-const Welcome = ({ onStart }) => (
-  <div style={{
-    minHeight: '100vh',
-    background: 'linear-gradient(160deg, #0c1445 0%, #1a237e 40%, #0d47a1 70%, #0c2461 100%)',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    fontFamily: 'Georgia, serif', color: 'white', padding: 24,
-    position: 'relative', overflow: 'hidden',
-  }}>
-    {/* Decorative tiles background */}
+const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError }) => {
+  const urlRoom = new URLSearchParams(window.location.search).get('room');
+  const [view, setView] = useState(urlRoom ? 'join' : 'main');
+  const [name, setName] = useState('');
+  const [joinCode, setJoinCode] = useState(urlRoom || '');
+  const [loading, setLoading] = useState(false);
+
+  const inputStyle = {
+    padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)',
+    background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 14,
+    fontFamily: 'Georgia, serif', outline: 'none', width: '100%',
+  };
+
+  const handleCreate = () => {
+    if (!name.trim()) return;
+    setLoading(true);
+    onCreateRoom(name.trim());
+  };
+
+  const handleJoin = () => {
+    if (!name.trim() || !joinCode.trim()) return;
+    setLoading(true);
+    onJoinRoom(name.trim(), joinCode.trim().toUpperCase());
+  };
+
+  return (
     <div style={{
-      position: 'absolute', inset: 0, opacity: 0.04, pointerEvents: 'none',
-      backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(255,255,255,1) 40px, rgba(255,255,255,1) 41px),
-                        repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,1) 40px, rgba(255,255,255,1) 41px)`,
-    }} />
-
-    {/* Suit decorations */}
-    <div style={{ position: 'absolute', top: 40, left: 40, fontSize: 80, opacity: 0.06, pointerEvents: 'none' }}>♠</div>
-    <div style={{ position: 'absolute', top: 40, right: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♥</div>
-    <div style={{ position: 'absolute', bottom: 40, left: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♦</div>
-    <div style={{ position: 'absolute', bottom: 40, right: 40, fontSize: 80, opacity: 0.06, pointerEvents: 'none' }}>♣</div>
-
-    {/* Title */}
-    <div style={{ textAlign: 'center', marginBottom: 48, position: 'relative' }}>
-      <div style={{ fontSize: 11, letterSpacing: 8, color: '#90caf9', marginBottom: 8, textTransform: 'uppercase' }}>
-        Jogo de Cartas Português
-      </div>
-      <h1 style={{
-        fontSize: 96, margin: 0, letterSpacing: 12, fontWeight: 'bold',
-        background: 'linear-gradient(135deg, #fcd34d, #f59e0b, #fbbf24)',
-        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        filter: 'drop-shadow(0 0 40px rgba(245,158,11,0.4))',
-      }}>
-        SUECA
-      </h1>
-      <div style={{ fontSize: 36, letterSpacing: 20, marginTop: 8 }}>
-        <span>♠</span>
-        <span style={{ color: '#dc2626' }}>♥</span>
-        <span style={{ color: '#dc2626' }}>♦</span>
-        <span>♣</span>
-      </div>
-    </div>
-
-    {/* Rules card */}
-    <div style={{
-      background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)',
-      border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20,
-      padding: '24px 36px', maxWidth: 480, marginBottom: 40, width: '100%',
+      minHeight: '100vh',
+      background: 'linear-gradient(160deg, #0c1445 0%, #1a237e 40%, #0d47a1 70%, #0c2461 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Georgia, serif', color: 'white', padding: 24,
+      position: 'relative', overflow: 'hidden',
     }}>
-      <div style={{ fontSize: 13, color: '#fcd34d', fontWeight: 'bold', marginBottom: 16, textAlign: 'center', letterSpacing: 2 }}>
-        COMO JOGAR
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px', fontSize: 12, color: '#cbd5e1', lineHeight: 1.6 }}>
-        <div>
-          <div style={{ color: '#86efac', fontWeight: 'bold', marginBottom: 4 }}>Equipas</div>
-          <div>Você + Norte vs Oeste + Este</div>
-        </div>
-        <div>
-          <div style={{ color: '#86efac', fontWeight: 'bold', marginBottom: 4 }}>Objectivo</div>
-          <div>Ganhar ≥ 61 pontos por rodada</div>
-        </div>
-        <div>
-          <div style={{ color: '#fcd34d', fontWeight: 'bold', marginBottom: 4 }}>Pontuação</div>
-          <div>Ás=11 &nbsp; 7=10 &nbsp; Rei=4<br />Valete=3 &nbsp; Dama=2</div>
-        </div>
-        <div>
-          <div style={{ color: '#fcd34d', fontWeight: 'bold', marginBottom: 4 }}>Regras</div>
-          <div>Siga o naipe ou jogue qualquer carta</div>
-        </div>
-      </div>
-      <div style={{ marginTop: 16, fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
-        Clique numa carta para a seleccionar · Clique novamente para jogar
-      </div>
-    </div>
+      <div style={{ position: 'absolute', top: 40, left: 40, fontSize: 80, opacity: 0.06, pointerEvents: 'none' }}>♠</div>
+      <div style={{ position: 'absolute', top: 40, right: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♥</div>
+      <div style={{ position: 'absolute', bottom: 40, left: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♦</div>
+      <div style={{ position: 'absolute', bottom: 40, right: 40, fontSize: 80, opacity: 0.06, pointerEvents: 'none' }}>♣</div>
 
-    <button onClick={onStart} style={{
-      padding: '16px 64px', fontSize: 18, borderRadius: 50, border: 'none',
-      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-      color: 'white', fontWeight: 'bold', cursor: 'pointer',
-      letterSpacing: 4, fontFamily: 'Georgia, serif',
-      boxShadow: '0 4px 24px rgba(245,158,11,0.5), 0 0 0 1px rgba(255,255,255,0.1)',
-      transition: 'transform 0.15s, box-shadow 0.15s',
-    }}
-      onMouseEnter={e => { e.target.style.transform = 'scale(1.05)'; e.target.style.boxShadow = '0 8px 32px rgba(245,158,11,0.7)'; }}
-      onMouseLeave={e => { e.target.style.transform = 'scale(1)'; e.target.style.boxShadow = '0 4px 24px rgba(245,158,11,0.5)'; }}
-    >
-      JOGAR
-    </button>
-  </div>
-);
+      {/* Title */}
+      <div style={{ textAlign: 'center', marginBottom: 36, position: 'relative' }}>
+        <div style={{ fontSize: 11, letterSpacing: 8, color: '#90caf9', marginBottom: 8 }}>Jogo de Cartas Português</div>
+        <h1 style={{
+          fontSize: 88, margin: 0, letterSpacing: 12, fontWeight: 'bold',
+          background: 'linear-gradient(135deg, #fcd34d, #f59e0b, #fbbf24)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          filter: 'drop-shadow(0 0 40px rgba(245,158,11,0.4))',
+        }}>SUECA</h1>
+        <div style={{ fontSize: 36, letterSpacing: 20, marginTop: 4 }}>
+          <span>♠</span><span style={{ color: '#dc2626' }}>♥</span>
+          <span style={{ color: '#dc2626' }}>♦</span><span>♣</span>
+        </div>
+      </div>
+
+      {view === 'main' && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%', maxWidth: 360 }}>
+          <button onClick={onSolo} style={{
+            width: '100%', padding: '16px 0', fontSize: 17, borderRadius: 50, border: 'none',
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: 'white', fontWeight: 'bold', cursor: 'pointer',
+            letterSpacing: 3, fontFamily: 'Georgia, serif',
+            boxShadow: '0 4px 24px rgba(245,158,11,0.5)',
+          }}>
+            ▶ JOGAR SOLO
+          </button>
+          <button onClick={() => setView('online')} style={{
+            width: '100%', padding: '14px 0', fontSize: 15, borderRadius: 50,
+            border: '1px solid rgba(255,255,255,0.3)',
+            background: 'rgba(255,255,255,0.08)',
+            color: 'white', cursor: 'pointer',
+            letterSpacing: 2, fontFamily: 'Georgia, serif',
+          }}>
+            🌐 JOGAR ONLINE
+          </button>
+          <div style={{ fontSize: 11, color: '#475569', textAlign: 'center', marginTop: 8 }}>
+            Solo: você + 3 robôs · Online: até 4 jogadores reais
+          </div>
+        </div>
+      )}
+
+      {view === 'online' && (
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 640 }}>
+          {/* Create room */}
+          <div style={{
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 16, padding: '24px 28px', flex: 1, minWidth: 240,
+          }}>
+            <div style={{ fontSize: 12, color: '#fcd34d', letterSpacing: 2, marginBottom: 16 }}>CRIAR SALA</div>
+            <input
+              style={inputStyle} placeholder="O seu nome" value={name}
+              onChange={e => { setName(e.target.value); clearError(); }}
+              onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            />
+            <button onClick={handleCreate} disabled={loading || !name.trim()} style={{
+              marginTop: 12, width: '100%', padding: '11px 0', borderRadius: 30, border: 'none',
+              background: name.trim() ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(255,255,255,0.1)',
+              color: 'white', fontWeight: 'bold', cursor: name.trim() ? 'pointer' : 'default',
+              fontFamily: 'Georgia, serif', fontSize: 13, letterSpacing: 2,
+            }}>
+              {loading ? 'A ligar…' : '+ CRIAR SALA'}
+            </button>
+          </div>
+
+          {/* Join room */}
+          <div style={{
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 16, padding: '24px 28px', flex: 1, minWidth: 240,
+          }}>
+            <div style={{ fontSize: 12, color: '#86efac', letterSpacing: 2, marginBottom: 16 }}>ENTRAR EM SALA</div>
+            <input
+              style={{ ...inputStyle, marginBottom: 8 }} placeholder="O seu nome" value={name}
+              onChange={e => { setName(e.target.value); clearError(); }}
+            />
+            <input
+              style={{ ...inputStyle, letterSpacing: 6, textTransform: 'uppercase', textAlign: 'center', fontSize: 18 }}
+              placeholder="XXXX" maxLength={4} value={joinCode}
+              onChange={e => { setJoinCode(e.target.value.toUpperCase()); clearError(); }}
+              onKeyDown={e => e.key === 'Enter' && handleJoin()}
+            />
+            <button onClick={handleJoin} disabled={loading || !name.trim() || !joinCode.trim()} style={{
+              marginTop: 12, width: '100%', padding: '11px 0', borderRadius: 30, border: 'none',
+              background: (name.trim() && joinCode.trim()) ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.1)',
+              color: 'white', fontWeight: 'bold',
+              cursor: (name.trim() && joinCode.trim()) ? 'pointer' : 'default',
+              fontFamily: 'Georgia, serif', fontSize: 13, letterSpacing: 2,
+            }}>
+              {loading ? 'A ligar…' : '→ ENTRAR'}
+            </button>
+          </div>
+
+          {wsError && (
+            <div style={{
+              width: '100%', padding: '10px 16px', borderRadius: 10,
+              background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
+              color: '#fca5a5', fontSize: 13, textAlign: 'center',
+            }}>{wsError}</div>
+          )}
+        </div>
+      )}
+
+      {view === 'join' && (
+        <div style={{
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 16, padding: '24px 28px', width: '100%', maxWidth: 320,
+        }}>
+          <div style={{ fontSize: 12, color: '#86efac', letterSpacing: 2, marginBottom: 4 }}>ENTRAR EM SALA</div>
+          <div style={{ fontSize: 22, letterSpacing: 10, color: '#fcd34d', marginBottom: 16 }}>{urlRoom}</div>
+          <input
+            style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)',
+              background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 14,
+              fontFamily: 'Georgia, serif', outline: 'none', width: '100%' }}
+            placeholder="O seu nome" value={name}
+            onChange={e => { setName(e.target.value); clearError(); }}
+            onKeyDown={e => e.key === 'Enter' && handleJoin()}
+            autoFocus
+          />
+          {wsError && (
+            <div style={{ marginTop: 8, color: '#fca5a5', fontSize: 12 }}>{wsError}</div>
+          )}
+          <button onClick={handleJoin} disabled={loading || !name.trim()} style={{
+            marginTop: 12, width: '100%', padding: '12px 0', borderRadius: 30, border: 'none',
+            background: name.trim() ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.1)',
+            color: 'white', fontWeight: 'bold', cursor: name.trim() ? 'pointer' : 'default',
+            fontFamily: 'Georgia, serif', fontSize: 14, letterSpacing: 2,
+          }}>
+            {loading ? 'A ligar…' : '→ ENTRAR'}
+          </button>
+          <button onClick={() => setView('main')} style={{
+            marginTop: 8, background: 'none', border: 'none', color: '#475569',
+            cursor: 'pointer', fontSize: 12, fontFamily: 'Georgia, serif', width: '100%',
+          }}>← Voltar</button>
+        </div>
+      )}
+
+      {view !== 'main' && (
+        <button onClick={() => { setView('main'); clearError(); }} style={{
+          marginTop: 20, background: 'none', border: 'none', color: '#475569',
+          cursor: 'pointer', fontSize: 12, fontFamily: 'Georgia, serif',
+        }}>← Menu Principal</button>
+      )}
+    </div>
+  );
+};
 
 // ═══════════════════════════════════════════
 // ROUND END OVERLAY
 // ═══════════════════════════════════════════
-const RoundEnd = ({ roundPts, gamePts, onNewRound, onNewGame }) => {
-  const aWins = roundPts[0] >= 61;
+const RoundEnd = ({ roundPts, gamePts, perspective, players, onNewRound, onNewGame }) => {
+  const myTeam = TEAM[perspective];
+  const myPts = roundPts[myTeam], theirPts = roundPts[1 - myTeam];
+  const iWin = myPts >= 61;
+  const partnerPos = (perspective + 2) % 4;
+  const getName = pos => players.find(p => p.position === pos)?.name || PNAME[pos];
+  const myLabel = `${getName(perspective)} + ${getName(partnerPos)}`;
+  const theirLabel = `${getName((perspective+1)%4)} + ${getName((perspective+3)%4)}`;
+
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
@@ -576,26 +526,21 @@ const RoundEnd = ({ roundPts, gamePts, onNewRound, onNewGame }) => {
       <div style={{
         background: 'linear-gradient(145deg, #1e293b, #0f172a)',
         borderRadius: 24, padding: '40px 48px', textAlign: 'center',
-        border: `2px solid ${aWins ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
-        boxShadow: `0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px ${aWins ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`,
+        border: `2px solid ${iWin ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
+        boxShadow: `0 24px 80px rgba(0,0,0,0.6)`,
         maxWidth: 400, fontFamily: 'Georgia, serif', color: 'white',
       }}>
-        <div style={{ fontSize: 64, marginBottom: 8 }}>{aWins ? '🎉' : '😔'}</div>
-        <h2 style={{
-          fontSize: 32, margin: '0 0 4px',
-          color: aWins ? '#86efac' : '#fca5a5',
-        }}>
-          {aWins ? 'Vitória!' : 'Derrota!'}
+        <div style={{ fontSize: 64, marginBottom: 8 }}>{iWin ? '🎉' : '😔'}</div>
+        <h2 style={{ fontSize: 32, margin: '0 0 4px', color: iWin ? '#86efac' : '#fca5a5' }}>
+          {iWin ? 'Vitória!' : 'Derrota!'}
         </h2>
         <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>
-          {aWins ? 'A vossa equipa ganhou esta rodada' : 'Os adversários ganharam esta rodada'}
+          {iWin ? 'A vossa equipa ganhou esta rodada' : 'Os adversários ganharam esta rodada'}
         </div>
-
-        {/* Score bars */}
         <div style={{ marginBottom: 24 }}>
           {[
-            { label: 'Nós (Você + Norte)', pts: roundPts[0], color: '#22c55e', team: 0 },
-            { label: 'Eles (Oeste + Este)', pts: roundPts[1], color: '#ef4444', team: 1 },
+            { label: myLabel, pts: myPts, color: '#22c55e' },
+            { label: theirLabel, pts: theirPts, color: '#ef4444' },
           ].map(({ label, pts, color }) => (
             <div key={label} style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>
@@ -603,42 +548,28 @@ const RoundEnd = ({ roundPts, gamePts, onNewRound, onNewGame }) => {
                 <span style={{ color, fontWeight: 'bold' }}>{pts} pts</span>
               </div>
               <div style={{ height: 8, background: '#1e293b', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', background: color, borderRadius: 4,
-                  width: `${(pts / 120) * 100}%`,
-                  transition: 'width 0.8s cubic-bezier(.4,0,.2,1)',
-                }} />
+                <div style={{ height: '100%', background: color, borderRadius: 4, width: `${(pts / 120) * 100}%`, transition: 'width 0.8s' }} />
               </div>
             </div>
           ))}
         </div>
-
-        <div style={{
-          padding: '12px 20px', background: 'rgba(255,255,255,0.05)',
-          borderRadius: 12, marginBottom: 24, fontSize: 13, color: '#94a3b8',
-        }}>
-          Partidas ganhas — <span style={{ color: '#86efac', fontWeight: 'bold' }}>Nós: {gamePts[0]}</span>
-          {' '} | {' '}
-          <span style={{ color: '#fca5a5', fontWeight: 'bold' }}>Eles: {gamePts[1]}</span>
+        <div style={{ padding: '12px 20px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, marginBottom: 24, fontSize: 13, color: '#94a3b8' }}>
+          Partidas ganhas —{' '}
+          <span style={{ color: '#86efac', fontWeight: 'bold' }}>Nós: {gamePts[myTeam]}</span>
+          {' | '}
+          <span style={{ color: '#fca5a5', fontWeight: 'bold' }}>Eles: {gamePts[1 - myTeam]}</span>
         </div>
-
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
           <button onClick={onNewRound} style={{
             padding: '12px 32px', fontSize: 15, borderRadius: 30, border: 'none',
             background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-            color: 'white', fontWeight: 'bold', cursor: 'pointer',
-            fontFamily: 'Georgia, serif', letterSpacing: 1,
-          }}>
-            Nova Rodada
-          </button>
+            color: 'white', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Georgia, serif',
+          }}>Nova Rodada</button>
           <button onClick={onNewGame} style={{
             padding: '12px 32px', fontSize: 15, borderRadius: 30,
             border: '1px solid rgba(255,255,255,0.2)',
-            background: 'transparent', color: '#94a3b8', cursor: 'pointer',
-            fontFamily: 'Georgia, serif',
-          }}>
-            Novo Jogo
-          </button>
+            background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontFamily: 'Georgia, serif',
+          }}>Novo Jogo</button>
         </div>
       </div>
     </div>
@@ -649,53 +580,168 @@ const RoundEnd = ({ roundPts, gamePts, onNewRound, onNewGame }) => {
 // MAIN GAME
 // ═══════════════════════════════════════════
 export default function Sueca() {
-  const [state, dispatch] = useReducer(reduce, INIT);
+  // ── Solo mode state ──
+  const [localState, localDispatch] = useReducer(reduce, INIT);
 
-  // Clear resolved trick after delay
-  useEffect(() => {
-    if (state.phase !== 'resolving') return;
-    const t = setTimeout(() => dispatch({ type: 'CLEAR' }), 1600);
-    return () => clearTimeout(t);
-  }, [state.phase, state.trick.length]);
+  // ── Multiplayer state ──
+  const wsRef = useRef(null);
+  const [multiMode, setMultiMode] = useState(false);
+  const [wsState, setWsState] = useState(null);
+  const [myPosition, setMyPosition] = useState(0);
+  const [roomId, setRoomId] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [appView, setAppView] = useState('welcome'); // 'welcome' | 'lobby' | 'game'
+  const [localSel, setLocalSel] = useState(null);
+  const [wsError, setWsError] = useState('');
 
-  // AI plays
+  // Active state/perspective
+  const state = multiMode ? wsState : localState;
+  const sel = multiMode ? localSel : localState.sel;
+  const perspective = multiMode ? myPosition : 0;
+
+  // Perspective-based visual positions
+  const topPos   = (perspective + 2) % 4;
+  const leftPos  = (perspective + 1) % 4;
+  const rightPos = (perspective + 3) % 4;
+
+  // ── Unified dispatch ──
+  const dispatch = useCallback((action) => {
+    if (multiMode && wsRef.current?.readyState === 1) {
+      if (action.type === 'SEL') {
+        setLocalSel(prev => prev?.id === action.card.id ? null : action.card);
+        return;
+      }
+      if (action.type === 'PLAY') setLocalSel(null);
+      wsRef.current.send(JSON.stringify({ type: 'GAME_ACTION', action }));
+    } else {
+      localDispatch(action);
+    }
+  }, [multiMode]);
+
+  // ── WebSocket connection helper ──
+  const connectWS = useCallback((onOpen) => {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const socket = new WebSocket(`${proto}://${location.host}/ws`);
+    wsRef.current = socket;
+    socket.onopen = onOpen;
+    socket.onmessage = e => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'ROOM_CREATED') {
+        setMyPosition(msg.position); setRoomId(msg.roomId);
+        setMultiMode(true); setAppView('lobby');
+      } else if (msg.type === 'JOINED') {
+        setMyPosition(msg.position); setRoomId(msg.roomId);
+        setMultiMode(true); setAppView('lobby');
+      } else if (msg.type === 'STATE_UPDATE') {
+        setWsState(msg.state); setPlayers(msg.players);
+        if (msg.state.phase !== 'welcome') setAppView('game');
+      } else if (msg.type === 'ERROR') {
+        setWsError(msg.message);
+      }
+    };
+    socket.onclose = () => { /* could show reconnect UI */ };
+  }, []);
+
+  const handleCreateRoom = useCallback(name => {
+    connectWS(() => wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', name })));
+  }, [connectWS]);
+
+  const handleJoinRoom = useCallback((name, code) => {
+    connectWS(() => wsRef.current.send(JSON.stringify({ type: 'JOIN_ROOM', name, roomId: code })));
+  }, [connectWS]);
+
+  const handleLeave = () => {
+    wsRef.current?.close();
+    setMultiMode(false); setWsState(null); setPlayers([]); setRoomId(null);
+    setLocalSel(null); setAppView('welcome'); setWsError('');
+  };
+
+  // ── Solo AI effects ──
   useEffect(() => {
-    if (state.phase !== 'playing' || state.current === 0) return;
+    if (multiMode || !state || state.phase !== 'playing' || state.current === 0) return;
     const delay = 700 + Math.random() * 500;
     const t = setTimeout(() => {
       const card = aiPick(state.hands[state.current], state.trick, state.trump, state.current);
-      if (card) dispatch({ type: 'PLAY', pi: state.current, card });
+      if (card) localDispatch({ type: 'PLAY', pi: state.current, card });
     }, delay);
     return () => clearTimeout(t);
-  }, [state.phase, state.current, state.trick, state.hands, state.trump]);
+  }, [multiMode, state?.phase, state?.current, state?.trick?.length]);
 
-  if (state.phase === 'welcome') {
-    return <Welcome onStart={() => dispatch({ type: 'START' })} />;
+  useEffect(() => {
+    if (multiMode || !state || state.phase !== 'resolving') return;
+    const t = setTimeout(() => localDispatch({ type: 'CLEAR' }), 1600);
+    return () => clearTimeout(t);
+  }, [multiMode, state?.phase, state?.trick?.length]);
+
+  // ── Routing ──
+  if (appView === 'welcome') {
+    return (
+      <Welcome
+        onSolo={() => { localDispatch({ type: 'START' }); setAppView('game'); }}
+        onCreateRoom={handleCreateRoom}
+        onJoinRoom={handleJoinRoom}
+        wsError={wsError}
+        clearError={() => setWsError('')}
+      />
+    );
   }
 
-  const isYourTurn = state.phase === 'playing' && state.current === 0;
-  const showTrick = state.phase === 'resolving' || (state.phase === 'playing' && state.trick.length > 0) || state.phase === 'round_end';
-  // Trump card is visible only while the DEALER still holds it
+  if (appView === 'lobby') {
+    return (
+      <Lobby
+        roomId={roomId}
+        players={players}
+        myPosition={myPosition}
+        onStart={() => wsRef.current?.send(JSON.stringify({ type: 'GAME_ACTION', action: { type: 'START' } }))}
+        onLeave={handleLeave}
+      />
+    );
+  }
+
+  if (!state) return null;
+
+  // ── Game render ──
+  const isYourTurn = state.phase === 'playing' && state.current === perspective;
+  const myTeam = TEAM[perspective];
+
+  const getName = pos => {
+    if (!multiMode) return pos === perspective ? 'Você' : PNAME[pos];
+    return players.find(p => p.position === pos)?.name || PNAME[pos];
+  };
+  const isHumanPlayer = pos => multiMode ? players.some(p => p.position === pos) : pos === 0;
+  const isPlaying = pos => state.phase === 'playing' && state.current === pos;
+
+  // Trump card visibility and position
   const trumpCardHeld = state.trumpCard &&
     state.hands[state.dealer] &&
     state.hands[state.dealer].some(c => c.id === state.trumpCard.id);
-  // Position trump card between dealer's hand and trick area
+  const dealerSlot = (state.dealer - perspective + 4) % 4; // 0=bottom,1=left,2=top,3=right
   const trumpPos = [
-    { bottom: '27%', left: '48%', transform: 'translateX(-50%) rotate(-12deg)' },  // dealer=0 (south/you)
-    { left: '26%',  top: '46%',  transform: 'translateY(-50%) rotate(10deg)' },    // dealer=1 (west)
-    { top: '13%',   left: '48%', transform: 'translateX(-50%) rotate(12deg)' },    // dealer=2 (north)
-    { left: '63%',  top: '46%',  transform: 'translateY(-50%) rotate(-10deg)' },   // dealer=3 (east)
-  ][state.dealer] || {};
+    { bottom: '27%', left: '48%', transform: 'translateX(-50%) rotate(-12deg)' },
+    { left: '26%',  top: '46%',  transform: 'translateY(-50%) rotate(10deg)' },
+    { top: '13%',   left: '48%', transform: 'translateX(-50%) rotate(12deg)' },
+    { left: '63%',  top: '46%',  transform: 'translateY(-50%) rotate(-10deg)' },
+  ][dealerSlot] || {};
+
+  const playerLabel = (pos, color, bg, border) => (
+    <div style={{
+      padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 'bold',
+      background: bg, border: `1px solid ${border}`,
+      color, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5,
+    }}>
+      <span>{isHumanPlayer(pos) ? '👤' : '🤖'}</span>
+      <span>{getName(pos)}{isPlaying(pos) ? ' …' : ''}</span>
+    </div>
+  );
 
   return (
     <div style={{
       minHeight: '100vh',
       background: 'radial-gradient(ellipse at 50% 30%, #1b5e20 0%, #145214 40%, #0a3300 100%)',
       fontFamily: 'Georgia, serif', color: 'white',
-      display: 'flex', flexDirection: 'column',
-      position: 'relative',
+      display: 'flex', flexDirection: 'column', position: 'relative',
     }}>
-      {/* Felt texture overlay */}
+      {/* Felt texture */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none',
         backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 3h1v1H1V3zm2-2h1v1H3V1z' fill='rgba(0,0,0,0.08)'/%3E%3C/svg%3E")`,
@@ -714,21 +760,18 @@ export default function Sueca() {
           fontSize: 22, fontWeight: 'bold', letterSpacing: 5,
           background: 'linear-gradient(135deg, #fcd34d, #f59e0b)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          cursor: multiMode ? 'default' : 'pointer',
         }}>SUECA</div>
 
-        {/* Scores */}
+        {/* Scores (always from your perspective: Nós vs Eles) */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {[
-            { label: 'NÓS', pts: state.roundPts[0], wins: state.gamePts[0], color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
-            { label: 'ELES', pts: state.roundPts[1], wins: state.gamePts[1], color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+            { label: 'NÓS', pts: state.roundPts[myTeam], wins: state.gamePts[myTeam], color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
+            { label: 'ELES', pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
           ].map(({ label, pts, wins, color, bg }, i) => (
-            <div key={i} style={{
-              padding: '6px 14px', borderRadius: 12,
-              background: bg, border: `1px solid ${color}44`,
-              textAlign: 'center', minWidth: 70,
-            }}>
-              <div style={{ fontSize: 9, color: color, letterSpacing: 2, marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: 18, fontWeight: 'bold', color: color, lineHeight: 1 }}>{pts}</div>
+            <div key={i} style={{ padding: '6px 14px', borderRadius: 12, background: bg, border: `1px solid ${color}44`, textAlign: 'center', minWidth: 70 }}>
+              <div style={{ fontSize: 9, color, letterSpacing: 2, marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 18, fontWeight: 'bold', color, lineHeight: 1 }}>{pts}</div>
               <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
                 {'★'.repeat(wins)}{'☆'.repeat(Math.max(0, 4 - wins))}
               </div>
@@ -753,6 +796,11 @@ export default function Sueca() {
           <div style={{ fontSize: 10, color: '#64748b', textAlign: 'right', lineHeight: 1.6 }}>
             {state.tricksLeft} vazas<br />restantes
           </div>
+          {multiMode && (
+            <div style={{ fontSize: 10, color: '#475569', borderLeft: '1px solid #1e293b', paddingLeft: 10 }}>
+              Sala<br /><span style={{ color: '#fcd34d', fontWeight: 'bold', letterSpacing: 2 }}>{roomId}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -761,16 +809,12 @@ export default function Sueca() {
         flex: 1, position: 'relative', zIndex: 5,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '16px 12px',
-        gap: 8,
+        padding: '16px 12px', gap: 8,
       }}>
 
         {/* Floating trump card near dealer */}
         {trumpCardHeld && (
-          <div style={{
-            position: 'absolute', zIndex: 20, pointerEvents: 'none',
-            ...trumpPos,
-          }}>
+          <div style={{ position: 'absolute', zIndex: 20, pointerEvents: 'none', ...trumpPos }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
               <div style={{ fontSize: 9, color: '#fcd34d', letterSpacing: 1, textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
                 trunfo
@@ -780,64 +824,35 @@ export default function Sueca() {
           </div>
         )}
 
-        {/* North player */}
+        {/* Top player (partner) */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-          <div style={{
-            padding: '4px 16px', borderRadius: 20, fontSize: 11, fontWeight: 'bold',
-            background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)',
-            color: '#86efac', display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <span>🤖</span>
-            <span>Norte — Parceiro</span>
-            {state.current === 2 && state.phase === 'playing' && (
-              <span style={{ color: '#fcd34d', animation: 'none' }}>⟵ a jogar…</span>
-            )}
-          </div>
-          <NorthHand count={state.hands[2].length} />
+          {playerLabel(topPos, '#86efac', 'rgba(34,197,94,0.15)', 'rgba(34,197,94,0.3)')}
+          <NorthHand count={state.hands[topPos].length} />
         </div>
 
         {/* Middle row */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 20, width: '100%',
-        }}>
-          {/* West */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, width: '100%' }}>
+          {/* Left */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 90 }}>
-            <div style={{
-              padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 'bold',
-              background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-              color: '#fca5a5', whiteSpace: 'nowrap',
-            }}>
-              🤖 Oeste {state.current === 1 && state.phase === 'playing' ? '…' : ''}
-            </div>
-            <SideHand count={state.hands[1].length} side="left" />
+            {playerLabel(leftPos, '#fca5a5', 'rgba(239,68,68,0.15)', 'rgba(239,68,68,0.3)')}
+            <SideHand count={state.hands[leftPos].length} side="left" />
           </div>
 
-          {/* Center: trick area only */}
+          {/* Center trick area */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              background: 'rgba(0,0,0,0.2)',
-              borderRadius: 16,
-              border: '1px solid rgba(255,255,255,0.06)',
-              padding: 12,
-            }}>
+            <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 12 }}>
               <TrickArea
                 trick={state.trick}
                 trickWinner={state.phase === 'resolving' ? state.trickWinner : null}
+                perspective={perspective}
               />
             </div>
           </div>
 
-          {/* East */}
+          {/* Right */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 90 }}>
-            <div style={{
-              padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 'bold',
-              background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-              color: '#fca5a5', whiteSpace: 'nowrap',
-            }}>
-              🤖 Este {state.current === 3 && state.phase === 'playing' ? '…' : ''}
-            </div>
-            <SideHand count={state.hands[3].length} side="right" />
+            {playerLabel(rightPos, '#fca5a5', 'rgba(239,68,68,0.15)', 'rgba(239,68,68,0.3)')}
+            <SideHand count={state.hands[rightPos].length} side="right" />
           </div>
         </div>
 
@@ -849,27 +864,21 @@ export default function Sueca() {
           fontSize: 13, color: isYourTurn ? '#86efac' : '#94a3b8',
           textAlign: 'center', transition: 'all 0.3s',
         }}>
-          {state.msg}
-          {isYourTurn && state.sel && ' · Clique novamente para jogar!'}
+          {isYourTurn ? '✨ Sua vez!' : state.msg}
+          {isYourTurn && sel && ' · Clique novamente para jogar!'}
         </div>
 
-        {/* Human hand */}
+        {/* Your hand */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            position: 'relative',
-            overflow: 'visible',
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'center',
-          }}>
+          <div style={{ position: 'relative', overflow: 'visible', width: '100%', display: 'flex', justifyContent: 'center' }}>
             <PlayerHand
-              hand={state.hands[0]}
+              hand={state.hands[perspective]}
               trick={state.trick}
               trump={state.trump}
-              sel={state.sel}
-              onSel={card => dispatch({ type: 'SEL', card })}
-              onPlay={card => dispatch({ type: 'PLAY', pi: 0, card })}
-              onReorder={(from, to) => dispatch({ type: 'REORDER_HAND', from, to })}
+              sel={sel}
+              onSel={card => dispatch({ type: 'SEL', card, pi: perspective })}
+              onPlay={card => dispatch({ type: 'PLAY', pi: perspective, card })}
+              onReorder={(from, to) => dispatch({ type: 'REORDER_HAND', from, to, pi: perspective })}
             />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -879,10 +888,10 @@ export default function Sueca() {
               color: '#86efac', display: 'flex', alignItems: 'center', gap: 6,
             }}>
               <span>👤</span>
-              <span>Você {isYourTurn ? '← sua vez!' : ''}</span>
+              <span>{getName(perspective)} {isYourTurn ? '← sua vez!' : ''}</span>
             </div>
             <button
-              onClick={() => dispatch({ type: 'AUTO_ORDER_HAND' })}
+              onClick={() => dispatch({ type: 'AUTO_ORDER_HAND', pi: perspective })}
               style={{
                 padding: '4px 14px', borderRadius: 20, fontSize: 11, fontWeight: 'bold',
                 background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)',
@@ -900,6 +909,8 @@ export default function Sueca() {
         <RoundEnd
           roundPts={state.roundPts}
           gamePts={state.gamePts}
+          perspective={perspective}
+          players={players}
           onNewRound={() => dispatch({ type: 'NEW_ROUND' })}
           onNewGame={() => dispatch({ type: 'START' })}
         />
@@ -916,6 +927,7 @@ export default function Sueca() {
           100% { transform: scale(1); opacity: 1; }
         }
         button:active { transform: scale(0.97) !important; }
+        input::placeholder { color: #475569; }
       `}</style>
     </div>
   );
