@@ -635,9 +635,9 @@ export default function Sueca() {
   // Position trump card between dealer's hand and trick area
   const trumpPos = [
     { bottom: '14%', left: '48%', transform: 'translateX(-50%) rotate(-12deg)' },  // dealer=0 (south/you)
-    { left: '16%',  top: '46%',  transform: 'translateY(-50%) rotate(10deg)' },    // dealer=1 (west)
+    { left: '26%',  top: '46%',  transform: 'translateY(-50%) rotate(10deg)' },    // dealer=1 (west)
     { top: '13%',   left: '48%', transform: 'translateX(-50%) rotate(12deg)' },    // dealer=2 (north)
-    { right: '16%', top: '46%',  transform: 'translateY(-50%) rotate(-10deg)' },   // dealer=3 (east)
+    { left: '63%',  top: '46%',  transform: 'translateY(-50%) rotate(-10deg)' },   // dealer=3 (east)
   ][state.dealer] || {};
 
   return (
