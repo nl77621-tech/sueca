@@ -185,7 +185,7 @@ const VideoTile = ({ stream, muted = false, mirror = false, scale = 1 }) => {
   const ref = useRef(null);
   useEffect(() => { if (ref.current) ref.current.srcObject = stream ?? null; }, [stream]);
   if (!stream) return null;
-  const w = Math.round(80 * scale), h = Math.round(60 * scale), br = Math.round(6 * scale);
+  const w = Math.round(140 * scale), h = Math.round(105 * scale), br = Math.round(8 * scale);
   return (
     <div style={{ width: w, height: h, borderRadius: br, overflow: 'hidden', flexShrink: 0,
       background: '#0f172a', border: '1px solid rgba(255,255,255,0.18)', position: 'relative' }}>
