@@ -326,11 +326,11 @@ const VideoTile = ({ stream, muted = false, mirror = false, scale = 1 }) => {
 // CARD COMPONENTS
 // ═══════════════════════════════════════════
 const Card = ({ card, onClick, hilite, sel, small, scale = 1 }) => {
-  const bw = small ? 54 : 96, bh = small ? 76 : 134;
+  const bw = small ? 59 : 106, bh = small ? 84 : 147;
   const w = Math.round(bw * scale), h = Math.round(bh * scale);
-  const fs1 = Math.round((small ? 13 : 18) * scale);
-  const fs2 = Math.round((small ? 26 : 40) * scale);
-  const pad = `${Math.round((small ? 3 : 7) * scale)}px ${Math.round((small ? 4 : 8) * scale)}px`;
+  const fs1 = Math.round((small ? 14 : 20) * scale);
+  const fs2 = Math.round((small ? 29 : 44) * scale);
+  const pad = `${Math.round((small ? 3 : 8) * scale)}px ${Math.round((small ? 4 : 9) * scale)}px`;
   const br = Math.round(8 * scale);
   const red = RED[card.si];
   return (
@@ -362,7 +362,7 @@ const Card = ({ card, onClick, hilite, sel, small, scale = 1 }) => {
 };
 
 const CardBack = ({ small, rotated, scale = 1 }) => {
-  const bw = small ? 54 : 96, bh = small ? 76 : 134;
+  const bw = small ? 59 : 106, bh = small ? 84 : 147;
   const w = Math.round(bw * scale), h = Math.round(bh * scale);
   const br = Math.round(8 * scale);
   const inset = Math.round(4 * scale);
@@ -397,9 +397,9 @@ const CardBack = ({ small, rotated, scale = 1 }) => {
 // ═══════════════════════════════════════════
 const NorthHand = ({ count, scale = 1 }) => {
   const n = Math.min(count, 10);
-  const spread = Math.round(20 * scale);
-  const cardW = Math.round(54 * scale);
-  const cardH = Math.round(76 * scale);
+  const spread = Math.round(22 * scale);
+  const cardW = Math.round(59 * scale);
+  const cardH = Math.round(84 * scale);
   const totalW = n > 1 ? (n - 1) * spread + cardW : cardW;
   return (
     <div style={{ position: 'relative', width: totalW, height: cardH }}>
@@ -417,9 +417,9 @@ const NorthHand = ({ count, scale = 1 }) => {
 
 const SideHand = ({ count, side, scale = 1 }) => {
   const n = Math.min(count, 10);
-  const spread = Math.round(14 * scale);
-  const cardW = Math.round(54 * scale);
-  const cardH = Math.round(76 * scale);
+  const spread = Math.round(15 * scale);
+  const cardW = Math.round(59 * scale);
+  const cardH = Math.round(84 * scale);
   const totalH = n > 1 ? (n - 1) * spread + cardW : cardW;
   return (
     <div style={{ position: 'relative', height: totalH, width: cardH }}>
@@ -442,9 +442,9 @@ const SideHand = ({ count, side, scale = 1 }) => {
 // ═══════════════════════════════════════════
 const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder, scale = 1 }) => {
   const vd = new Set(validCards(hand, trick, trump).map(c => c.id));
-  const spread = Math.round(52 * scale);
-  const cardW = Math.round(96 * scale);
-  const handH = Math.round(110 * scale);
+  const spread = Math.round(57 * scale);
+  const cardW = Math.round(106 * scale);
+  const handH = Math.round(121 * scale);
   const maxW = Math.round(700 * scale);
   const n = hand.length;
   const totalW = n > 1 ? (n - 1) * spread + cardW : cardW;
