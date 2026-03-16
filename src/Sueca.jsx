@@ -187,6 +187,15 @@ const reduce = (state, action) => {
       hand.splice(to, 0, moved);
       return { ...state, hands: state.hands.map((h, i) => i === 0 ? hand : h) };
     }
+    case 'AUTO_ORDER_HAND': {
+      const t = state.trump;
+      const hand = [...state.hands[0]];
+      const trumps = hand.filter(c => c.si === t).sort((a, b) => RNK[b.v] - RNK[a.v]);
+      const others = hand.filter(c => c.si !== t)
+        .sort((a, b) => a.si !== b.si ? a.si - b.si : RNK[b.v] - RNK[a.v]);
+      const sorted = [...trumps, ...others];
+      return { ...state, hands: state.hands.map((h, i) => i === 0 ? sorted : h) };
+    }
     default: return state;
   }
 };
@@ -863,13 +872,25 @@ export default function Sueca() {
               onReorder={(from, to) => dispatch({ type: 'REORDER_HAND', from, to })}
             />
           </div>
-          <div style={{
-            padding: '4px 20px', borderRadius: 20, fontSize: 11, fontWeight: 'bold',
-            background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)',
-            color: '#86efac', display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <span>👤</span>
-            <span>Você {isYourTurn ? '← sua vez!' : ''}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              padding: '4px 20px', borderRadius: 20, fontSize: 11, fontWeight: 'bold',
+              background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)',
+              color: '#86efac', display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span>👤</span>
+              <span>Você {isYourTurn ? '← sua vez!' : ''}</span>
+            </div>
+            <button
+              onClick={() => dispatch({ type: 'AUTO_ORDER_HAND' })}
+              style={{
+                padding: '4px 14px', borderRadius: 20, fontSize: 11, fontWeight: 'bold',
+                background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)',
+                color: '#fcd34d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              ✦ Auto Ordenar
+            </button>
           </div>
         </div>
       </div>
