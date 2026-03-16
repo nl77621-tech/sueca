@@ -1264,7 +1264,7 @@ export default function Sueca() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {state.trump !== null && (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -1279,6 +1279,40 @@ export default function Sueca() {
               </div>
             </div>
           )}
+
+          {/* Dealer & Next-to-play badges */}
+          {state.phase !== 'welcome' && (() => {
+            const isMyTurn = state.phase === 'playing' && state.current === perspective;
+            const nextName = state.phase === 'playing'
+              ? (state.current === perspective ? 'Você' : getName(state.current))
+              : null;
+            const dealerName = state.dealer === perspective ? 'Você' : getName(state.dealer);
+            const badgeBase = { display: 'flex', flexDirection: 'column', alignItems: 'center',
+              padding: `3px ${Math.max(5, Math.round(9 * Math.min(1, window.innerWidth / 600)))}px`,
+              borderRadius: 8, minWidth: Math.max(40, Math.round(52 * Math.min(1, window.innerWidth / 600))) };
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ ...badgeBase, background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.35)' }}>
+                  <div style={{ fontSize: 'clamp(6px, 1.2vw, 8px)', color: '#fbbf24', letterSpacing: 1 }}>DADOR</div>
+                  <div style={{ fontSize: 'clamp(8px, 1.8vw, 11px)', color: '#fde68a', fontWeight: 'bold', lineHeight: 1.2, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {dealerName}
+                  </div>
+                </div>
+                {nextName && (
+                  <div style={{ ...badgeBase,
+                    background: isMyTurn ? 'rgba(34,197,94,0.2)' : 'rgba(148,163,184,0.1)',
+                    border: `1px solid ${isMyTurn ? 'rgba(34,197,94,0.6)' : 'rgba(148,163,184,0.2)'}`,
+                  }}>
+                    <div style={{ fontSize: 'clamp(6px, 1.2vw, 8px)', color: isMyTurn ? '#4ade80' : '#94a3b8', letterSpacing: 1 }}>VEZ</div>
+                    <div style={{ fontSize: 'clamp(8px, 1.8vw, 11px)', color: isMyTurn ? '#86efac' : '#cbd5e1', fontWeight: 'bold', lineHeight: 1.2, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {nextName}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           <div style={{ fontSize: 'clamp(8px, 2vw, 10px)', color: '#64748b', textAlign: 'right', lineHeight: 1.6 }}>
             {state.tricksLeft}<br />vazas
           </div>
