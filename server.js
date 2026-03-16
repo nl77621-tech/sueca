@@ -166,6 +166,17 @@ wss.on('connection', (ws) => {
       if (!room) return;
       const action = { ...msg.action };
 
+      // Require all 4 players connected before the game can start
+      if (action.type === 'START' || action.type === 'NEW_ROUND') {
+        const connectedCount = room.players.filter(p => p.connected).length;
+        if (connectedCount < 4) {
+          send({ type: 'ERROR', message: room.players.length < 4
+            ? 'Sala não está cheia (4/4)'
+            : 'Nem todos os jogadores estão ligados' });
+          return;
+        }
+      }
+
       // Attach player index for actions that need it
       if (['REORDER_HAND', 'AUTO_ORDER_HAND'].includes(action.type)) action.pi = myPosition;
       // Validate ownership for PLAY

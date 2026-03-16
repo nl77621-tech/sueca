@@ -734,13 +734,29 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
       </div>
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <button onClick={onStart} style={{
+      {(() => {
+        const connectedCount = players.filter(p => p.connected).length;
+        const allReady = connectedCount === 4;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            {!allReady && (
+              <div style={{ fontSize: 12, color: '#64748b', letterSpacing: 1 }}>
+                {lang === 'pt'
+                  ? `À espera de jogadores… ${connectedCount}/4`
+                  : `Waiting for players… ${connectedCount}/4`}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <button onClick={allReady ? onStart : undefined} style={{
           padding: '12px 36px', borderRadius: 30, border: 'none',
-          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-          color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: 14,
+          background: allReady
+            ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+            : 'rgba(255,255,255,0.08)',
+          color: allReady ? 'white' : '#475569',
+          fontWeight: 'bold', cursor: allReady ? 'pointer' : 'not-allowed', fontSize: 14,
           fontFamily: 'Georgia, serif', letterSpacing: 2,
-          boxShadow: '0 4px 20px rgba(245,158,11,0.4)',
+          boxShadow: allReady ? '0 4px 20px rgba(245,158,11,0.4)' : 'none',
+          transition: 'all 0.3s',
         }}>
           {tr.startGame}
         </button>
@@ -752,7 +768,10 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
         }}>
           {tr.leave}
         </button>
-      </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
