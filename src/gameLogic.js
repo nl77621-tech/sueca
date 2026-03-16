@@ -71,14 +71,19 @@ export const aiPick = (hand, trick, t, me) => {
 // ═══════════════════════════════════════════
 // DEAL
 // ═══════════════════════════════════════════
+const autoOrder = (hand, trump) => {
+  const trumps = hand.filter(c => c.si === trump).sort((a, b) => RNK[b.v] - RNK[a.v]);
+  const others = hand.filter(c => c.si !== trump).sort((a, b) => a.si !== b.si ? a.si - b.si : RNK[b.v] - RNK[a.v]);
+  return [...trumps, ...others];
+};
+
 export const deal = dealer => {
   const deck = shuf(mkDeck());
   const tc = deck[39];
   const rawHands = [deck.slice(0, 10), deck.slice(10, 20), deck.slice(20, 30), deck.slice(30, 40)];
   const hands = Array(4).fill(null).map((_, i) => {
-    if (i === dealer) return rawHands[3];
-    const idx = i < dealer ? i : i - 1;
-    return rawHands[idx];
+    const raw = i === dealer ? rawHands[3] : rawHands[i < dealer ? i : i - 1];
+    return autoOrder(raw, tc.si); // pre-sort every hand on deal
   });
   const first = (dealer + 3) % 4; // play goes counter-clockwise (right of dealer leads)
   return { hands, trump: tc.si, trumpCard: tc, current: first, leader: first };
