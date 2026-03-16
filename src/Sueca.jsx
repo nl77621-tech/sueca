@@ -86,8 +86,14 @@ const aiPick = (hand, trick, t, me) => {
 // ═══════════════════════════════════════════
 const deal = dealer => {
   const deck = shuf(mkDeck());
-  const hands = [deck.slice(0, 10), deck.slice(10, 20), deck.slice(20, 30), deck.slice(30, 40)];
-  const tc = deck[39];
+  const tc = deck[39]; // last card is always the trump card
+  // rawHands[3] always contains tc; rotate so dealer gets rawHands[3]
+  const rawHands = [deck.slice(0, 10), deck.slice(10, 20), deck.slice(20, 30), deck.slice(30, 40)];
+  const hands = Array(4).fill(null).map((_, i) => {
+    if (i === dealer) return rawHands[3];
+    const idx = i < dealer ? i : i - 1;
+    return rawHands[idx];
+  });
   const first = (dealer + 1) % 4;
   return { hands, trump: tc.si, trumpCard: tc, current: first, leader: first };
 };
