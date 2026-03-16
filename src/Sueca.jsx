@@ -409,8 +409,8 @@ const TrumpBadge = ({ trump, trumpCard }) => (
       {S[trump]}
     </div>
     {trumpCard && (
-      <div style={{ transform: 'scale(0.75)', transformOrigin: 'top center', marginTop: -8 }}>
-        <Card card={trumpCard} />
+      <div style={{ marginTop: 4 }}>
+        <Card card={trumpCard} small />
       </div>
     )}
   </div>
