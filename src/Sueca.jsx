@@ -626,10 +626,10 @@ export default function Sueca() {
   const trumpCardHeld = state.trumpCard && state.hands.some(h => h.some(c => c.id === state.trumpCard.id));
   // Position trump card near dealer: 0=south(bottom), 1=west(left), 2=north(top), 3=east(right)
   const trumpPos = [
-    { bottom: 220, left: '50%', transform: 'translateX(-30px) rotate(20deg)' },   // dealer=0 (you)
-    { left: 110, top: '50%', transform: 'translateY(-38px) rotate(100deg)' },      // dealer=1 (west)
-    { top: 110, left: '50%', transform: 'translateX(-30px) rotate(-15deg)' },      // dealer=2 (north)
-    { right: 110, top: '50%', transform: 'translateY(-38px) rotate(-100deg)' },    // dealer=3 (east)
+    { bottom: '28%', left: '48%', transform: 'translateX(-50%) rotate(-12deg)' },  // dealer=0 (south/you)
+    { left: '32%',  top: '46%',  transform: 'translateY(-50%) rotate(10deg)' },    // dealer=1 (west)
+    { top: '22%',   left: '48%', transform: 'translateX(-50%) rotate(12deg)' },    // dealer=2 (north)
+    { right: '32%', top: '46%',  transform: 'translateY(-50%) rotate(-10deg)' },   // dealer=3 (east)
   ][state.dealer] || {};
 
   return (
