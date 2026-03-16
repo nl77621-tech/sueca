@@ -1272,10 +1272,9 @@ export default function Sueca() {
   const isPlaying = pos => state.phase === 'playing' && state.current === pos;
 
   // Trump card visibility and position.
-  // Only show the floating indicator before the first card of the round is played.
-  // Once any card hits the table it disappears — the trump SUIT stays visible in the header.
+  // Show during the entire first trick; hide once all 4 players have played
+  // (tricksLeft drops from 10→9 when the first trick is resolved).
   const trumpCardHeld = state.trumpCard &&
-    state.trick.length === 0 &&
     state.tricksLeft === 10 &&
     state.hands[state.dealer] &&
     state.hands[state.dealer].some(c => c.id === state.trumpCard.id);
