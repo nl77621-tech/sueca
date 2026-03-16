@@ -622,14 +622,16 @@ export default function Sueca() {
 
   const isYourTurn = state.phase === 'playing' && state.current === 0;
   const showTrick = state.phase === 'resolving' || (state.phase === 'playing' && state.trick.length > 0) || state.phase === 'round_end';
-  // Trump card is visible as long as it's still in someone's hand
-  const trumpCardHeld = state.trumpCard && state.hands.some(h => h.some(c => c.id === state.trumpCard.id));
-  // Position trump card near dealer: 0=south(bottom), 1=west(left), 2=north(top), 3=east(right)
+  // Trump card is visible only while the DEALER still holds it
+  const trumpCardHeld = state.trumpCard &&
+    state.hands[state.dealer] &&
+    state.hands[state.dealer].some(c => c.id === state.trumpCard.id);
+  // Position trump card between dealer's hand and trick area
   const trumpPos = [
-    { bottom: '28%', left: '48%', transform: 'translateX(-50%) rotate(-12deg)' },  // dealer=0 (south/you)
-    { left: '32%',  top: '46%',  transform: 'translateY(-50%) rotate(10deg)' },    // dealer=1 (west)
-    { top: '22%',   left: '48%', transform: 'translateX(-50%) rotate(12deg)' },    // dealer=2 (north)
-    { right: '32%', top: '46%',  transform: 'translateY(-50%) rotate(-10deg)' },   // dealer=3 (east)
+    { bottom: '14%', left: '48%', transform: 'translateX(-50%) rotate(-12deg)' },  // dealer=0 (south/you)
+    { left: '16%',  top: '46%',  transform: 'translateY(-50%) rotate(10deg)' },    // dealer=1 (west)
+    { top: '13%',   left: '48%', transform: 'translateX(-50%) rotate(12deg)' },    // dealer=2 (north)
+    { right: '16%', top: '46%',  transform: 'translateY(-50%) rotate(-10deg)' },   // dealer=3 (east)
   ][state.dealer] || {};
 
   return (
