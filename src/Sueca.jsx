@@ -622,6 +622,15 @@ export default function Sueca() {
 
   const isYourTurn = state.phase === 'playing' && state.current === 0;
   const showTrick = state.phase === 'resolving' || (state.phase === 'playing' && state.trick.length > 0) || state.phase === 'round_end';
+  // Trump card is visible as long as it's still in someone's hand
+  const trumpCardHeld = state.trumpCard && state.hands.some(h => h.some(c => c.id === state.trumpCard.id));
+  // Position trump card near dealer: 0=south(bottom), 1=west(left), 2=north(top), 3=east(right)
+  const trumpPos = [
+    { bottom: 220, left: '50%', transform: 'translateX(-30px) rotate(20deg)' },   // dealer=0 (you)
+    { left: 110, top: '50%', transform: 'translateY(-38px) rotate(100deg)' },      // dealer=1 (west)
+    { top: 110, left: '50%', transform: 'translateX(-30px) rotate(-15deg)' },      // dealer=2 (north)
+    { right: 110, top: '50%', transform: 'translateY(-38px) rotate(-100deg)' },    // dealer=3 (east)
+  ][state.dealer] || {};
 
   return (
     <div style={{
@@ -672,7 +681,20 @@ export default function Sueca() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {state.trump !== null && (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              padding: '4px 12px', borderRadius: 10,
+              background: RED[state.trump] ? 'rgba(220,38,38,0.2)' : 'rgba(30,41,59,0.6)',
+              border: `1px solid ${RED[state.trump] ? '#dc2626' : '#64748b'}`,
+            }}>
+              <div style={{ fontSize: 9, color: '#94a3b8', letterSpacing: 1 }}>TRUNFO</div>
+              <div style={{ fontSize: 22, color: RED[state.trump] ? '#f87171' : '#e2e8f0', fontWeight: 'bold', lineHeight: 1 }}>
+                {S[state.trump]}
+              </div>
+            </div>
+          )}
           <div style={{ fontSize: 10, color: '#64748b', textAlign: 'right', lineHeight: 1.6 }}>
             {state.tricksLeft} vazas<br />restantes
           </div>
@@ -687,6 +709,21 @@ export default function Sueca() {
         padding: '16px 12px',
         gap: 8,
       }}>
+
+        {/* Floating trump card near dealer */}
+        {trumpCardHeld && (
+          <div style={{
+            position: 'absolute', zIndex: 20, pointerEvents: 'none',
+            ...trumpPos,
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+              <div style={{ fontSize: 9, color: '#fcd34d', letterSpacing: 1, textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+                trunfo
+              </div>
+              <Card card={state.trumpCard} small />
+            </div>
+          </div>
+        )}
 
         {/* North player */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -721,9 +758,8 @@ export default function Sueca() {
             <SideHand count={state.hands[1].length} side="left" />
           </div>
 
-          {/* Center: trick + trump */}
+          {/* Center: trick area only */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-            {/* Trick area */}
             <div style={{
               background: 'rgba(0,0,0,0.2)',
               borderRadius: 16,
@@ -735,11 +771,6 @@ export default function Sueca() {
                 trickWinner={state.phase === 'resolving' ? state.trickWinner : null}
               />
             </div>
-
-            {/* Trump */}
-            {state.trump !== null && (
-              <TrumpBadge trump={state.trump} trumpCard={state.trumpCard} />
-            )}
           </div>
 
           {/* East */}
