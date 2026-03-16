@@ -80,7 +80,7 @@ export const deal = dealer => {
     const idx = i < dealer ? i : i - 1;
     return rawHands[idx];
   });
-  const first = (dealer + 1) % 4;
+  const first = (dealer + 3) % 4; // play goes counter-clockwise (right of dealer leads)
   return { hands, trump: tc.si, trumpCard: tc, current: first, leader: first };
 };
 
@@ -108,7 +108,7 @@ export const reduce = (state, action) => {
       };
     }
     case 'NEW_ROUND': {
-      const dealer = (state.dealer + 1) % 4;
+      const dealer = (state.dealer + 3) % 4; // dealer rotates counter-clockwise
       const { hands, trump, trumpCard, current, leader } = deal(dealer);
       return {
         ...state, phase: 'playing', hands, trump, trumpCard, current, leader, dealer,
@@ -131,7 +131,7 @@ export const reduce = (state, action) => {
       const newH = state.hands.map((h, i) => i === pi ? h.filter(c => c.id !== card.id) : h);
       const newT = [...state.trick, { player: pi, card }];
       if (newT.length < 4) {
-        const nxt = (pi + 1) % 4;
+        const nxt = (pi + 3) % 4; // counter-clockwise: next player is to the right
         return { ...state, hands: newH, trick: newT, current: nxt, sel: null, msg: `${PNAME[nxt]} a jogar…` };
       }
       const w = trickWinner(newT, state.trump);
