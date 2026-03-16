@@ -39,8 +39,12 @@ const broadcast = (room) => {
 const scheduleAI = (room) => {
   const { state } = room;
   if (state.phase !== 'playing' && state.phase !== 'resolving') return;
-  const humanTurn = room.players.some(p => p.position === state.current && p.connected && p.ws?.readyState === 1);
-  if (humanTurn) return;
+  // In resolving phase we always need to schedule the CLEAR, regardless of who won the trick.
+  // Only skip scheduling in playing phase when it's actually a connected human's turn.
+  if (state.phase === 'playing') {
+    const humanTurn = room.players.some(p => p.position === state.current && p.connected && p.ws?.readyState === 1);
+    if (humanTurn) return;
+  }
 
   clearTimeout(room.aiTimer);
   room.aiTimer = setTimeout(() => {
