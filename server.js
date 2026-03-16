@@ -129,6 +129,21 @@ wss.on('connection', (ws) => {
       broadcast(room);
     }
 
+    else if (['RTC_READY', 'RTC_OFFER', 'RTC_ANSWER', 'RTC_ICE'].includes(msg.type)) {
+      const room = rooms.get(myRoomId);
+      if (!room) return;
+      const out = JSON.stringify({ ...msg, fromPosition: myPosition });
+      if (msg.toPosition === -1) {
+        // Broadcast to everyone else in the room
+        for (const p of room.players) {
+          if (p.position !== myPosition && p.ws?.readyState === 1) p.ws.send(out);
+        }
+      } else {
+        const target = room.players.find(p => p.position === msg.toPosition);
+        if (target?.ws?.readyState === 1) target.ws.send(out);
+      }
+    }
+
     else if (msg.type === 'GAME_ACTION') {
       const room = rooms.get(myRoomId);
       if (!room) return;

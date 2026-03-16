@@ -20,6 +20,183 @@ const useGameScale = () => {
 };
 
 // ═══════════════════════════════════════════
+// WEBRTC HOOK  (peer-to-peer video & audio)
+// ═══════════════════════════════════════════
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+];
+
+const useWebRTC = ({ wsRef, myPositionRef, playersRef }) => {
+  const localStreamRef  = useRef(null);
+  const pcsRef          = useRef({});        // position → RTCPeerConnection
+  const makingOfferRef  = useRef({});        // position → bool
+  const [localStream,   setLocalStream]   = useState(null);
+  const [remoteStreams, setRemoteStreams]  = useState({});
+  const [audioEnabled,  setAudioEnabled]  = useState(true);
+  const [videoEnabled,  setVideoEnabled]  = useState(true);
+
+  const myPos  = () => myPositionRef.current;
+  const sendWS = (msg) => wsRef.current?.readyState === 1 && wsRef.current.send(JSON.stringify(msg));
+
+  const getOrCreatePC = useCallback((remotePos) => {
+    if (pcsRef.current[remotePos]) return pcsRef.current[remotePos];
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    pcsRef.current[remotePos] = pc;
+    makingOfferRef.current[remotePos] = false;
+
+    pc.ontrack = e => {
+      const stream = e.streams[0];
+      if (stream) setRemoteStreams(prev => ({ ...prev, [remotePos]: stream }));
+    };
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) sendWS({ type: 'RTC_ICE', toPosition: remotePos, candidate });
+    };
+    pc.onconnectionstatechange = () => {
+      if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
+        setRemoteStreams(prev => { const n = { ...prev }; delete n[remotePos]; return n; });
+      }
+    };
+    pc.onnegotiationneeded = async () => {
+      try {
+        makingOfferRef.current[remotePos] = true;
+        await pc.setLocalDescription();
+        sendWS({ type: 'RTC_OFFER', toPosition: remotePos, sdp: pc.localDescription });
+      } catch (e) { console.error('negotiation:', e); }
+      finally { makingOfferRef.current[remotePos] = false; }
+    };
+    return pc;
+  }, []);
+
+  const addTracksToPC = (pc, stream) => {
+    const senders = pc.getSenders();
+    stream.getTracks().forEach(t => {
+      if (!senders.some(s => s.track?.id === t.id)) pc.addTrack(t, stream);
+    });
+  };
+
+  const handleSignal = useCallback(async (msg) => {
+    const from = msg.fromPosition;
+    if (from === undefined || from === myPos()) return;
+
+    if (msg.type === 'RTC_READY') {
+      // I have media & I'm the lower-position player → I make the offer
+      if (localStreamRef.current && myPos() < from) {
+        const pc = getOrCreatePC(from);
+        addTracksToPC(pc, localStreamRef.current);
+        // addTrack triggers onnegotiationneeded → sends offer automatically
+      }
+      return;
+    }
+
+    if (msg.type === 'RTC_OFFER') {
+      const polite = myPos() > from;   // higher position = polite peer
+      const pc = getOrCreatePC(from);
+      const collision = makingOfferRef.current[from] || pc.signalingState !== 'stable';
+      if (collision && !polite) return; // impolite ignores glare
+      if (collision && polite) {
+        try { await pc.setLocalDescription({ type: 'rollback' }); } catch {}
+      }
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+      if (localStreamRef.current) addTracksToPC(pc, localStreamRef.current);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      sendWS({ type: 'RTC_ANSWER', toPosition: from, sdp: pc.localDescription });
+      return;
+    }
+
+    if (msg.type === 'RTC_ANSWER') {
+      const pc = pcsRef.current[from];
+      if (pc && pc.signalingState !== 'stable') {
+        try { await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)); } catch {}
+      }
+      return;
+    }
+
+    if (msg.type === 'RTC_ICE') {
+      const pc = pcsRef.current[from];
+      if (pc && msg.candidate) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
+      }
+    }
+  }, [getOrCreatePC]);
+
+  const enableMedia = useCallback(async (withVideo = true) => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: withVideo ? { width: 320, height: 240, facingMode: 'user' } : false,
+    });
+    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    localStreamRef.current = stream;
+    setLocalStream(stream);
+    setAudioEnabled(true);
+    setVideoEnabled(withVideo);
+
+    // Add tracks to any existing peer connections
+    for (const pc of Object.values(pcsRef.current)) addTracksToPC(pc, stream);
+
+    // Broadcast readiness; also connect to lower-position players we should offer
+    sendWS({ type: 'RTC_READY', toPosition: -1 });
+    for (const p of (playersRef.current || [])) {
+      if (p.position !== myPos() && myPos() < p.position) {
+        const pc = getOrCreatePC(p.position);
+        addTracksToPC(pc, stream);
+        // onnegotiationneeded fires → sends offer
+      }
+    }
+  }, [getOrCreatePC]);
+
+  const disableMedia = useCallback(() => {
+    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    localStreamRef.current = null;
+    setLocalStream(null);
+    Object.values(pcsRef.current).forEach(pc => pc.close());
+    pcsRef.current = {};
+    makingOfferRef.current = {};
+    setRemoteStreams({});
+    setAudioEnabled(true);
+    setVideoEnabled(true);
+  }, []);
+
+  const toggleAudio = useCallback(() => {
+    localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !t.enabled; });
+    setAudioEnabled(p => !p);
+  }, []);
+
+  const toggleVideo = useCallback(() => {
+    localStreamRef.current?.getVideoTracks().forEach(t => { t.enabled = !t.enabled; });
+    setVideoEnabled(p => !p);
+  }, []);
+
+  useEffect(() => () => {
+    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    Object.values(pcsRef.current).forEach(pc => pc.close());
+  }, []);
+
+  return { localStream, remoteStreams, audioEnabled, videoEnabled,
+           enableMedia, disableMedia, toggleAudio, toggleVideo, handleSignal };
+};
+
+// ═══════════════════════════════════════════
+// VIDEO TILE
+// ═══════════════════════════════════════════
+const VideoTile = ({ stream, muted = false, mirror = false, scale = 1 }) => {
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) ref.current.srcObject = stream ?? null; }, [stream]);
+  if (!stream) return null;
+  const w = Math.round(80 * scale), h = Math.round(60 * scale), br = Math.round(6 * scale);
+  return (
+    <div style={{ width: w, height: h, borderRadius: br, overflow: 'hidden', flexShrink: 0,
+      background: '#0f172a', border: '1px solid rgba(255,255,255,0.18)', position: 'relative' }}>
+      <video ref={ref} autoPlay playsInline muted={muted}
+        style={{ width: '100%', height: '100%', objectFit: 'cover',
+          transform: mirror ? 'scaleX(-1)' : 'none', display: 'block' }} />
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════
 // CARD COMPONENTS
 // ═══════════════════════════════════════════
 const Card = ({ card, onClick, hilite, sel, small, scale = 1 }) => {
@@ -255,7 +432,9 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1 }) => {
 // ═══════════════════════════════════════════
 // LOBBY SCREEN
 // ═══════════════════════════════════════════
-const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat }) => {
+const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
+                 localStream, onEnableMedia, onDisableMedia,
+                 audioEnabled, videoEnabled, onToggleAudio, onToggleVideo }) => {
   const gameUrl = `${window.location.origin}/?room=${roomId}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(gameUrl)}`;
   const [copied, setCopied] = useState(false);
@@ -306,14 +485,16 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat }) 
           )}
         </div>
         {occupant ? (
-          <div style={{ fontSize: 13, color: 'white', fontWeight: isMe ? 'bold' : 'normal' }}>
-            {occupant.name}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 13, color: 'white', fontWeight: isMe ? 'bold' : 'normal', flex: 1 }}>
+              {occupant.name}
+            </div>
+            {isMe && localStream && (
+              <VideoTile stream={localStream} muted mirror scale={0.55} />
+            )}
           </div>
         ) : (
-          <div style={{
-            fontSize: 12, color: '#475569',
-            display: 'flex', alignItems: 'center', gap: 5,
-          }}>
+          <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
             {canSit ? <span style={{ color: '#64748b' }}>+ Sentar aqui</span> : <span>Aguardando…</span>}
           </div>
         )}
@@ -382,6 +563,47 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat }) 
             {copied ? '✓ Copiado!' : '🔗 Copiar Link'}
           </button>
         </div>
+      </div>
+
+      {/* Media controls */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <div style={{ fontSize: 10, color: '#475569', letterSpacing: 1 }}>VÍDEO & ÁUDIO EM TEMPO REAL</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            onClick={() => localStream
+              ? onDisableMedia()
+              : onEnableMedia(true).catch(() => onEnableMedia(false).catch(() => {}))}
+            style={{
+              padding: '8px 18px', borderRadius: 30, cursor: 'pointer', fontSize: 12,
+              fontFamily: 'Georgia, serif',
+              background: localStream ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.07)',
+              border: `1px solid ${localStream ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.2)'}`,
+              color: localStream ? '#86efac' : '#94a3b8',
+            }}>
+            {localStream ? '📷 Câmara activa' : '📷 Ativar câmara + microfone'}
+          </button>
+          {localStream && (<>
+            <button onClick={onToggleAudio} title={audioEnabled ? 'Silenciar' : 'Ativar microfone'} style={{
+              width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 15,
+              background: audioEnabled ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+              color: audioEnabled ? '#86efac' : '#fca5a5',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{audioEnabled ? '🎤' : '🔇'}</button>
+            {localStream.getVideoTracks().length > 0 && (
+              <button onClick={onToggleVideo} title={videoEnabled ? 'Desligar vídeo' : 'Ligar vídeo'} style={{
+                width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 15,
+                background: videoEnabled ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+                color: videoEnabled ? '#86efac' : '#fca5a5',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>{videoEnabled ? '🎥' : '📵'}</button>
+            )}
+          </>)}
+        </div>
+        {!localStream && (
+          <div style={{ fontSize: 10, color: '#334155', textAlign: 'center' }}>
+            Opcional · os outros jogadores vêem e ouvem-te em directo
+          </div>
+        )}
       </div>
 
       {/* Action buttons */}
@@ -687,6 +909,37 @@ export default function Sueca() {
   // ── Responsive scale ──
   const scale = useGameScale();
 
+  // ── Refs kept fresh for WebRTC hook ──
+  const myPositionRef = useRef(myPosition);
+  const playersRef    = useRef(players);
+  useEffect(() => { myPositionRef.current = myPosition; }, [myPosition]);
+  useEffect(() => { playersRef.current = players; }, [players]);
+
+  // ── WebRTC ──
+  const rtc = useWebRTC({ wsRef, myPositionRef, playersRef });
+
+  // ── Stable WS message handler (ref updated every render) ──
+  const wsMessageRef = useRef(null);
+  wsMessageRef.current = (msg) => {
+    if (['RTC_READY', 'RTC_OFFER', 'RTC_ANSWER', 'RTC_ICE'].includes(msg.type)) {
+      rtc.handleSignal(msg); return;
+    }
+    if (msg.type === 'ROOM_CREATED') {
+      setMyPosition(msg.position); setRoomId(msg.roomId);
+      setMultiMode(true); setAppView('lobby');
+    } else if (msg.type === 'JOINED') {
+      setMyPosition(msg.position); setRoomId(msg.roomId);
+      setMultiMode(true); setAppView('lobby');
+    } else if (msg.type === 'SEAT_CHANGED') {
+      setMyPosition(msg.position);
+    } else if (msg.type === 'STATE_UPDATE') {
+      setWsState(msg.state); setPlayers(msg.players);
+      if (msg.state.phase !== 'welcome') setAppView('game');
+    } else if (msg.type === 'ERROR') {
+      setWsError(msg.message);
+    }
+  };
+
   // Active state/perspective
   const state = multiMode ? wsState : localState;
   const sel = multiMode ? localSel : localState.sel;
@@ -718,23 +971,9 @@ export default function Sueca() {
     wsRef.current = socket;
     socket.onopen = onOpen;
     socket.onmessage = e => {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'ROOM_CREATED') {
-        setMyPosition(msg.position); setRoomId(msg.roomId);
-        setMultiMode(true); setAppView('lobby');
-      } else if (msg.type === 'JOINED') {
-        setMyPosition(msg.position); setRoomId(msg.roomId);
-        setMultiMode(true); setAppView('lobby');
-      } else if (msg.type === 'SEAT_CHANGED') {
-        setMyPosition(msg.position);
-      } else if (msg.type === 'STATE_UPDATE') {
-        setWsState(msg.state); setPlayers(msg.players);
-        if (msg.state.phase !== 'welcome') setAppView('game');
-      } else if (msg.type === 'ERROR') {
-        setWsError(msg.message);
-      }
+      try { wsMessageRef.current?.(JSON.parse(e.data)); } catch {}
     };
-    socket.onclose = () => { /* could show reconnect UI */ };
+    socket.onclose = () => {};
   }, []);
 
   const handleCreateRoom = useCallback(name => {
@@ -746,6 +985,7 @@ export default function Sueca() {
   }, [connectWS]);
 
   const handleLeave = () => {
+    rtc.disableMedia();
     wsRef.current?.close();
     setMultiMode(false); setWsState(null); setPlayers([]); setRoomId(null);
     setLocalSel(null); setAppView('welcome'); setWsError('');
@@ -790,6 +1030,13 @@ export default function Sueca() {
         onStart={() => wsRef.current?.send(JSON.stringify({ type: 'GAME_ACTION', action: { type: 'START' } }))}
         onLeave={handleLeave}
         onChangeSeat={pos => wsRef.current?.send(JSON.stringify({ type: 'CHANGE_SEAT', toPosition: pos }))}
+        localStream={rtc.localStream}
+        onEnableMedia={rtc.enableMedia}
+        onDisableMedia={rtc.disableMedia}
+        audioEnabled={rtc.audioEnabled}
+        videoEnabled={rtc.videoEnabled}
+        onToggleAudio={rtc.toggleAudio}
+        onToggleVideo={rtc.toggleVideo}
       />
     );
   }
@@ -937,7 +1184,10 @@ export default function Sueca() {
 
         {/* Top player (partner) */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale) }}>
-          {playerLabel(topPos, '#86efac', 'rgba(34,197,94,0.15)', 'rgba(34,197,94,0.3)')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(6 * scale) }}>
+            {multiMode && <VideoTile stream={rtc.remoteStreams[topPos]} scale={scale} />}
+            {playerLabel(topPos, '#86efac', 'rgba(34,197,94,0.15)', 'rgba(34,197,94,0.3)')}
+          </div>
           <NorthHand count={state.hands[topPos].length} scale={scale} />
         </div>
 
@@ -946,6 +1196,7 @@ export default function Sueca() {
           {/* Left */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale), minWidth: sideMinW }}>
             {playerLabel(leftPos, '#fca5a5', 'rgba(239,68,68,0.15)', 'rgba(239,68,68,0.3)')}
+            {multiMode && <VideoTile stream={rtc.remoteStreams[leftPos]} scale={scale} />}
             <SideHand count={state.hands[leftPos].length} side="left" scale={scale} />
           </div>
 
@@ -964,6 +1215,7 @@ export default function Sueca() {
           {/* Right */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale), minWidth: sideMinW }}>
             {playerLabel(rightPos, '#fca5a5', 'rgba(239,68,68,0.15)', 'rgba(239,68,68,0.3)')}
+            {multiMode && <VideoTile stream={rtc.remoteStreams[rightPos]} scale={scale} />}
             <SideHand count={state.hands[rightPos].length} side="right" scale={scale} />
           </div>
         </div>
@@ -995,7 +1247,10 @@ export default function Sueca() {
               onReorder={(from, to) => dispatch({ type: 'REORDER_HAND', from, to, pi: perspective })}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(10 * scale) }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * scale), flexWrap: 'wrap', justifyContent: 'center' }}>
+            {multiMode && rtc.localStream && (
+              <VideoTile stream={rtc.localStream} muted mirror scale={scale} />
+            )}
             <div style={{
               padding: `${Math.round(4 * scale)}px ${Math.round(20 * scale)}px`,
               borderRadius: 20, fontSize: labelFs, fontWeight: 'bold',
@@ -1030,6 +1285,44 @@ export default function Sueca() {
           onNewRound={() => dispatch({ type: 'NEW_ROUND' })}
           onNewGame={() => dispatch({ type: 'START' })}
         />
+      )}
+
+      {/* Floating media controls (multiplayer only) */}
+      {multiMode && (
+        <div style={{
+          position: 'fixed', bottom: 14, right: 14, zIndex: 50,
+          display: 'flex', gap: 6, alignItems: 'center',
+          background: 'rgba(0,0,0,0.5)', borderRadius: 30, padding: '6px 10px',
+          border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(6px)',
+        }}>
+          <button
+            onClick={() => rtc.localStream
+              ? rtc.disableMedia()
+              : rtc.enableMedia(true).catch(() => rtc.enableMedia(false).catch(() => {}))}
+            title={rtc.localStream ? 'Desativar câmara' : 'Ativar câmara'}
+            style={{
+              width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 14,
+              background: rtc.localStream ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)',
+              color: rtc.localStream ? '#86efac' : '#64748b',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>📷</button>
+          {rtc.localStream && (<>
+            <button onClick={rtc.toggleAudio} title={rtc.audioEnabled ? 'Silenciar' : 'Ativar mic'} style={{
+              width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 14,
+              background: rtc.audioEnabled ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)',
+              color: rtc.audioEnabled ? '#86efac' : '#fca5a5',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{rtc.audioEnabled ? '🎤' : '🔇'}</button>
+            {rtc.localStream.getVideoTracks().length > 0 && (
+              <button onClick={rtc.toggleVideo} title={rtc.videoEnabled ? 'Desligar vídeo' : 'Ligar vídeo'} style={{
+                width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 14,
+                background: rtc.videoEnabled ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)',
+                color: rtc.videoEnabled ? '#86efac' : '#fca5a5',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>{rtc.videoEnabled ? '🎥' : '📵'}</button>
+            )}
+          </>)}
+        </div>
       )}
 
       <style>{`
