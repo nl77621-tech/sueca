@@ -118,7 +118,7 @@ wss.on('connection', (ws) => {
       const roomId = msg.roomId?.toUpperCase().trim();
       const room = rooms.get(roomId);
       if (!room) { send({ type: 'ERROR', message: 'Sala não encontrada' }); return; }
-      if (room.state.phase !== 'welcome') { send({ type: 'ERROR', message: 'O jogo já começou' }); return; }
+      if (room.state.phase !== 'welcome') { send({ type: 'ERROR', message: 'O jogo já começou — use o mesmo link para rejoin' }); return; }
       const taken = new Set(room.players.map(p => p.position));
       const pos = [1, 2, 3].find(p => !taken.has(p));
       if (pos === undefined) { send({ type: 'ERROR', message: 'Sala cheia (4/4)' }); return; }
@@ -127,6 +127,23 @@ wss.on('connection', (ws) => {
       myPosition = pos;
       send({ type: 'JOINED', roomId, position: pos });
       broadcast(room);
+    }
+
+    else if (msg.type === 'REJOIN_ROOM') {
+      const roomId = msg.roomId?.toUpperCase().trim();
+      const room = rooms.get(roomId);
+      if (!room) { send({ type: 'ERROR', message: 'Sala não encontrada' }); return; }
+      const claimedPos = parseInt(msg.position, 10);
+      const player = room.players.find(p => p.position === claimedPos && !p.connected);
+      if (!player) { send({ type: 'ERROR', message: 'Lugar não disponível' }); return; }
+      player.ws = ws;
+      player.connected = true;
+      if (msg.name) player.name = msg.name;
+      myRoomId = roomId;
+      myPosition = claimedPos;
+      send({ type: 'REJOINED', roomId, position: claimedPos });
+      broadcast(room);
+      scheduleAI(room); // AI was covering this seat; re-check if it should stand down
     }
 
     else if (['RTC_READY', 'RTC_OFFER', 'RTC_ANSWER', 'RTC_ICE'].includes(msg.type)) {

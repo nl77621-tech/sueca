@@ -963,6 +963,20 @@ export default function Sueca() {
   const [appView, setAppView] = useState('welcome'); // 'welcome' | 'lobby' | 'game'
   const [localSel, setLocalSel] = useState(null);
   const [wsError, setWsError] = useState('');
+  const [isRejoining, setIsRejoining] = useState(false);
+
+  // Persists the player's session so they can rejoin after a disconnect
+  const pendingNameRef  = useRef('');
+  const autoRejoinRef   = useRef(null); // { roomId, position, name }
+
+  const saveSession = (rid, pos, name) => {
+    autoRejoinRef.current = { roomId: rid, position: pos, name };
+    try { localStorage.setItem('sueca_session', JSON.stringify({ roomId: rid, position: pos, name })); } catch {}
+  };
+  const clearSession = () => {
+    autoRejoinRef.current = null;
+    try { localStorage.removeItem('sueca_session'); } catch {}
+  };
 
   // ── Responsive scale ──
   const scale = useGameScale();
@@ -985,16 +999,25 @@ export default function Sueca() {
     if (msg.type === 'ROOM_CREATED') {
       setMyPosition(msg.position); setRoomId(msg.roomId);
       setMultiMode(true); setAppView('lobby');
+      saveSession(msg.roomId, msg.position, pendingNameRef.current);
     } else if (msg.type === 'JOINED') {
       setMyPosition(msg.position); setRoomId(msg.roomId);
       setMultiMode(true); setAppView('lobby');
+      saveSession(msg.roomId, msg.position, pendingNameRef.current);
+    } else if (msg.type === 'REJOINED') {
+      setMyPosition(msg.position); setRoomId(msg.roomId);
+      setMultiMode(true); setIsRejoining(false); setAppView('lobby');
+      saveSession(msg.roomId, msg.position, autoRejoinRef.current?.name || pendingNameRef.current);
     } else if (msg.type === 'SEAT_CHANGED') {
       setMyPosition(msg.position);
+      // Update saved position after seat change
+      const s = autoRejoinRef.current;
+      if (s) saveSession(s.roomId, msg.position, s.name);
     } else if (msg.type === 'STATE_UPDATE') {
       setWsState(msg.state); setPlayers(msg.players);
       if (msg.state.phase !== 'welcome') setAppView('game');
     } else if (msg.type === 'ERROR') {
-      setWsError(msg.message);
+      setIsRejoining(false); setWsError(msg.message);
     }
   };
 
@@ -1024,6 +1047,7 @@ export default function Sueca() {
 
   // ── WebSocket connection helper ──
   const connectWS = useCallback((onOpen) => {
+    wsRef.current?.close();
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const socket = new WebSocket(`${proto}://${location.host}/ws`);
     wsRef.current = socket;
@@ -1031,23 +1055,54 @@ export default function Sueca() {
     socket.onmessage = e => {
       try { wsMessageRef.current?.(JSON.parse(e.data)); } catch {}
     };
-    socket.onclose = () => {};
+    socket.onclose = () => {
+      if (wsRef.current !== socket) return; // superseded by a newer connection
+      const session = autoRejoinRef.current;
+      if (!session) return; // user intentionally left, don't reconnect
+      // Brief network blip — auto-reconnect and rejoin
+      setTimeout(() => {
+        if (!autoRejoinRef.current || wsRef.current !== socket) return;
+        connectWS(() => wsRef.current?.send(JSON.stringify({
+          type: 'REJOIN_ROOM', roomId: session.roomId, position: session.position, name: session.name,
+        })));
+      }, 3000);
+    };
   }, []);
 
   const handleCreateRoom = useCallback(name => {
+    pendingNameRef.current = name;
     connectWS(() => wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', name })));
   }, [connectWS]);
 
   const handleJoinRoom = useCallback((name, code) => {
+    pendingNameRef.current = name;
     connectWS(() => wsRef.current.send(JSON.stringify({ type: 'JOIN_ROOM', name, roomId: code })));
   }, [connectWS]);
 
   const handleLeave = () => {
+    clearSession();
     rtc.disableMedia();
     wsRef.current?.close();
     setMultiMode(false); setWsState(null); setPlayers([]); setRoomId(null);
-    setLocalSel(null); setAppView('welcome'); setWsError('');
+    setLocalSel(null); setAppView('welcome'); setWsError(''); setIsRejoining(false);
   };
+
+  // ── Auto-rejoin on page load if URL matches a saved session ──
+  useEffect(() => {
+    const urlRoom = new URLSearchParams(window.location.search).get('room')?.toUpperCase();
+    if (!urlRoom) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem('sueca_session') || 'null');
+      if (saved?.roomId === urlRoom) {
+        autoRejoinRef.current = saved;
+        setIsRejoining(true);
+        connectWS(() => wsRef.current?.send(JSON.stringify({
+          type: 'REJOIN_ROOM', roomId: saved.roomId, position: saved.position, name: saved.name,
+        })));
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Solo AI effects ──
   useEffect(() => {
@@ -1068,6 +1123,22 @@ export default function Sueca() {
 
   // ── Routing ──
   if (appView === 'welcome') {
+    if (isRejoining) {
+      return (
+        <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', background: 'linear-gradient(135deg,#1e3a2f 0%,#14532d 60%,#052e16 100%)',
+          color: '#fff', fontFamily: 'system-ui,sans-serif', gap: 20 }}>
+          <div style={{ fontSize: 48 }}>🃏</div>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>A rejoin a sala…</div>
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>A reconnectar ao jogo</div>
+          <button onClick={handleLeave}
+            style={{ marginTop: 12, padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
+              background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 14 }}>
+            Cancelar
+          </button>
+        </div>
+      );
+    }
     return (
       <Welcome
         onSolo={() => { localDispatch({ type: 'START' }); setAppView('game'); }}
