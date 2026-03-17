@@ -45,6 +45,7 @@ const T = {
     gameRoom: 'SALA DE JOGO',
     chooseSeat: 'Escolhe o teu lugar · Equipas: Sul+Norte vs Oeste+Este',
     youLabel: 'VOCÊ', sitHere: '+ Sentar aqui', waiting: 'Aguardando…',
+    addBot: '🤖 Adicionar Bot', removeBot: '✕ Remover',
     teamA: 'EQUIPA A', teamB: 'EQUIPA B',
     scanQr: 'Digitalizar para entrar',
     copyLink: '🔗 Copiar Link', copied: '✓ Copiado!',
@@ -80,6 +81,7 @@ const T = {
     gameRoom: 'GAME ROOM',
     chooseSeat: 'Choose your seat · Teams: South+North vs West+East',
     youLabel: 'YOU', sitHere: '+ Sit here', waiting: 'Waiting…',
+    addBot: '🤖 Add Bot', removeBot: '✕ Remove',
     teamA: 'TEAM A', teamB: 'TEAM B',
     scanQr: 'Scan to join',
     copyLink: '🔗 Copy Link', copied: '✓ Copied!',
@@ -586,6 +588,7 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard =
 // LOBBY SCREEN
 // ═══════════════════════════════════════════
 const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
+                 onAddBot, onRemoveBot,
                  localStream, onEnableMedia, onDisableMedia,
                  audioEnabled, videoEnabled, onToggleAudio, onToggleVideo, lang }) => {
   const tr = T[lang];
@@ -609,11 +612,16 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
   const teamA = seats.filter(s => s.team === 0); // Sul + Norte
   const teamB = seats.filter(s => s.team === 1); // Oeste + Este
 
+  const isCreator = myPosition === 0;
+
   const SeatCard = ({ seat }) => {
     const occupant = players.find(p => p.position === seat.pos);
     const isMe = seat.pos === myPosition;
     const isEmpty = !occupant;
+    const isBot = occupant?.isBot;
     const canSit = isEmpty && !isMe;
+    const canAddBot = isEmpty && isCreator;
+    const canRemoveBot = isBot && isCreator;
 
     return (
       <div
@@ -622,8 +630,8 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
           padding: '10px 14px', borderRadius: 12,
           background: isMe
             ? `rgba(${seat.team === 0 ? '96,165,250' : '244,114,182'},0.2)`
-            : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${isMe ? seat.teamColor : 'rgba(255,255,255,0.1)'}`,
+            : isBot ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${isMe ? seat.teamColor : isBot ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.1)'}`,
           cursor: canSit ? 'pointer' : 'default',
           transition: 'all 0.2s',
           minWidth: 130,
@@ -634,22 +642,47 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
             {seat.label} {seat.dir}
           </span>
           {isMe && <span style={{ fontSize: 9, color: '#fcd34d', letterSpacing: 1 }}>{tr.youLabel}</span>}
-          {occupant && !isMe && (
+          {occupant && !isMe && !isBot && (
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: occupant.connected ? '#22c55e' : '#475569' }} />
           )}
+          {isBot && <span style={{ fontSize: 9, color: '#a78bfa', letterSpacing: 1 }}>BOT</span>}
         </div>
         {occupant ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ fontSize: 13, color: 'white', fontWeight: isMe ? 'bold' : 'normal', flex: 1 }}>
+            {isBot && <span style={{ fontSize: 14 }}>🤖</span>}
+            <div style={{ fontSize: 13, color: isBot ? '#c4b5fd' : 'white', fontWeight: isMe ? 'bold' : 'normal', flex: 1 }}>
               {occupant.name}
             </div>
             {isMe && localStream && (
               <VideoTile stream={localStream} muted mirror scale={0.55} />
             )}
+            {canRemoveBot && (
+              <button
+                onClick={e => { e.stopPropagation(); onRemoveBot(seat.pos); }}
+                style={{
+                  padding: '2px 8px', borderRadius: 8, border: 'none',
+                  background: 'rgba(239,68,68,0.2)', color: '#fca5a5',
+                  cursor: 'pointer', fontSize: 11,
+                }}
+              >{tr.removeBot}</button>
+            )}
           </div>
         ) : (
           <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
-            {canSit ? <span style={{ color: '#64748b' }}>{tr.sitHere}</span> : <span>{tr.waiting}</span>}
+            {canSit
+              ? <span style={{ color: '#64748b' }}>{tr.sitHere}</span>
+              : canAddBot
+                ? (
+                  <button
+                    onClick={e => { e.stopPropagation(); onAddBot(); }}
+                    style={{
+                      padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(139,92,246,0.4)',
+                      background: 'rgba(139,92,246,0.15)', color: '#c4b5fd',
+                      cursor: 'pointer', fontSize: 12, width: '100%',
+                    }}
+                  >{tr.addBot}</button>
+                )
+                : <span>{tr.waiting}</span>}
           </div>
         )}
       </div>
@@ -762,15 +795,15 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
 
       {/* Action buttons */}
       {(() => {
-        const connectedCount = players.filter(p => p.connected).length;
-        const allReady = connectedCount === 4;
+        const readyCount = players.filter(p => p.connected || p.isBot).length;
+        const allReady = readyCount === 4;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             {!allReady && (
               <div style={{ fontSize: 12, color: '#64748b', letterSpacing: 1 }}>
                 {lang === 'pt'
-                  ? `À espera de jogadores… ${connectedCount}/4`
-                  : `Waiting for players… ${connectedCount}/4`}
+                  ? `À espera de jogadores… ${readyCount}/4`
+                  : `Waiting for players… ${readyCount}/4`}
               </div>
             )}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1361,6 +1394,8 @@ export default function Sueca() {
         onStart={() => wsRef.current?.send(JSON.stringify({ type: 'GAME_ACTION', action: { type: 'START' } }))}
         onLeave={handleLeave}
         onChangeSeat={pos => wsRef.current?.send(JSON.stringify({ type: 'CHANGE_SEAT', toPosition: pos }))}
+        onAddBot={() => wsRef.current?.send(JSON.stringify({ type: 'ADD_BOT' }))}
+        onRemoveBot={pos => wsRef.current?.send(JSON.stringify({ type: 'REMOVE_BOT', position: pos }))}
         localStream={rtc.localStream}
         onEnableMedia={rtc.enableMedia}
         onDisableMedia={rtc.disableMedia}
@@ -1383,7 +1418,11 @@ export default function Sueca() {
     if (!multiMode) return pos === perspective ? tr.you : tr.pname[pos];
     return players.find(p => p.position === pos)?.name || tr.pname[pos];
   };
-  const isHumanPlayer = pos => multiMode ? players.some(p => p.position === pos) : pos === 0;
+  const isHumanPlayer = pos => {
+    if (!multiMode) return pos === 0;
+    const p = players.find(pl => pl.position === pos);
+    return p ? !p.isBot : false;
+  };
   const isPlaying = pos => state.phase === 'playing' && state.current === pos;
 
   // Trump card visibility and position.

@@ -28,7 +28,7 @@ const genId = () => {
 
 const broadcast = (room) => {
   const playerInfo = room.players.map(p => ({
-    position: p.position, name: p.name, connected: p.connected,
+    position: p.position, name: p.name, connected: p.connected, isBot: p.isBot || false,
   }));
   const payload = JSON.stringify({ type: 'STATE_UPDATE', state: room.state, players: playerInfo });
   for (const p of room.players) {
@@ -114,6 +114,30 @@ wss.on('connection', (ws) => {
       broadcast(room);
     }
 
+    else if (msg.type === 'ADD_BOT') {
+      const room = rooms.get(myRoomId);
+      if (!room || room.state.phase !== 'welcome') return;
+      if (myPosition !== 0) return; // only room creator can add bots
+      const taken = new Set(room.players.map(p => p.position));
+      const pos = [0, 1, 2, 3].find(p => !taken.has(p));
+      if (pos === undefined) return; // all seats taken
+      const botNum = room.players.filter(p => p.isBot).length + 1;
+      room.players.push({ ws: null, name: `Bot ${botNum}`, position: pos, connected: false, isBot: true });
+      broadcast(room);
+      // Don't scheduleAI yet — game hasn't started
+    }
+
+    else if (msg.type === 'REMOVE_BOT') {
+      const room = rooms.get(myRoomId);
+      if (!room || room.state.phase !== 'welcome') return;
+      if (myPosition !== 0) return; // only room creator can remove bots
+      const pos = msg.position;
+      const idx = room.players.findIndex(p => p.position === pos && p.isBot);
+      if (idx === -1) return;
+      room.players.splice(idx, 1);
+      broadcast(room);
+    }
+
     else if (msg.type === 'JOIN_ROOM') {
       const roomId = msg.roomId?.toUpperCase().trim();
       const room = rooms.get(roomId);
@@ -166,10 +190,10 @@ wss.on('connection', (ws) => {
       if (!room) return;
       const action = { ...msg.action };
 
-      // Require all 4 players connected before the game can start
+      // Require all 4 seats filled (humans connected or bots) before the game can start
       if (action.type === 'START' || action.type === 'NEW_ROUND') {
-        const connectedCount = room.players.filter(p => p.connected).length;
-        if (connectedCount < 4) {
+        const readyCount = room.players.filter(p => p.connected || p.isBot).length;
+        if (readyCount < 4) {
           send({ type: 'ERROR', message: room.players.length < 4
             ? 'Sala não está cheia (4/4)'
             : 'Nem todos os jogadores estão ligados' });
