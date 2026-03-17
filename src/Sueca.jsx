@@ -668,21 +668,23 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
             )}
           </div>
         ) : (
-          <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
-            {canSit
-              ? <span style={{ color: '#64748b' }}>{tr.sitHere}</span>
-              : canAddBot
-                ? (
-                  <button
-                    onClick={e => { e.stopPropagation(); onAddBot(); }}
-                    style={{
-                      padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(139,92,246,0.4)',
-                      background: 'rgba(139,92,246,0.15)', color: '#c4b5fd',
-                      cursor: 'pointer', fontSize: 12, width: '100%',
-                    }}
-                  >{tr.addBot}</button>
-                )
-                : <span>{tr.waiting}</span>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {canSit && (
+              <span style={{ fontSize: 12, color: '#64748b' }}>{tr.sitHere}</span>
+            )}
+            {canAddBot && (
+              <button
+                onClick={e => { e.stopPropagation(); onAddBot(); }}
+                style={{
+                  padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(139,92,246,0.4)',
+                  background: 'rgba(139,92,246,0.15)', color: '#c4b5fd',
+                  cursor: 'pointer', fontSize: 12, width: '100%',
+                }}
+              >{tr.addBot}</button>
+            )}
+            {!canSit && !canAddBot && (
+              <span style={{ fontSize: 12, color: '#475569' }}>{tr.waiting}</span>
+            )}
           </div>
         )}
       </div>
