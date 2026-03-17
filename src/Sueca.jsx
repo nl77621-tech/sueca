@@ -505,7 +505,7 @@ const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder, scale =
 // ═══════════════════════════════════════════
 // TRICK AREA (perspective-aware)
 // ═══════════════════════════════════════════
-const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1 }) => {
+const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard = null, trumpLabel = '' }) => {
   const p = perspective;
   const positions = {
     [p]:        { gridRow: 3, gridColumn: 2 },
@@ -548,17 +548,28 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1 }) => {
             ) : (
               <div style={{
                 width: phW, height: phH, borderRadius: phBr,
-                border: '2px dashed rgba(255,255,255,0.15)', opacity: 0.5,
+                border: '2px dashed rgba(255,255,255,0.08)', opacity: 0.4,
               }} />
             )}
           </div>
         );
       })}
+      {/* Centre cell — trump card during first trick, otherwise decorative diamond */}
       <div style={{
         gridRow: 2, gridColumn: 2,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: 'rgba(255,255,255,0.15)', fontSize: Math.round(28 * scale),
-      }}>✦</div>
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+      }}>
+        {trumpCard ? (
+          <>
+            <div style={{ fontSize: Math.max(7, Math.round(9 * scale)), color: '#fcd34d', letterSpacing: 1, textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontFamily: 'Georgia,serif', fontStyle: 'italic' }}>{trumpLabel}</div>
+            <div style={{ transform: 'rotate(-8deg)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.7))' }}>
+              <Card card={trumpCard} small scale={scale} />
+            </div>
+          </>
+        ) : (
+          <div style={{ color: 'rgba(255,255,255,0.1)', fontSize: Math.round(28 * scale) }}>✦</div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1374,174 +1385,161 @@ export default function Sueca() {
     state.tricksLeft === 10 &&
     state.hands[state.dealer] &&
     state.hands[state.dealer].some(c => c.id === state.trumpCard.id);
-  const dealerSlot = (state.dealer - perspective + 4) % 4; // 0=bottom,1=left,2=top,3=right
-  const trumpPos = [
-    { bottom: '27%', left: '48%', transform: 'translateX(-50%) rotate(-12deg)' },
-    { left: '26%',  top: '46%',  transform: 'translateY(-50%) rotate(10deg)' },
-    { top: '13%',   left: '48%', transform: 'translateX(-50%) rotate(12deg)' },
-    { left: '63%',  top: '46%',  transform: 'translateY(-50%) rotate(-10deg)' },
-  ][dealerSlot] || {};
 
   // Scaled sizes for layout spacing
   const sideMinW = Math.round(90 * scale);
   const trickPad = Math.round(12 * scale);
   const middleGap = Math.round(20 * scale);
-  const labelFs = Math.max(8, Math.round(10 * scale));
-  const msgFs = Math.max(10, Math.round(13 * scale));
+  const labelFs = Math.max(9, Math.round(11 * scale));
+  const msgFs = Math.max(11, Math.round(14 * scale));
 
-  const playerLabel = (pos, color, bg, border) => (
-    <div style={{
-      padding: `${Math.round(4 * scale)}px ${Math.round(10 * scale)}px`,
-      borderRadius: 20, fontSize: labelFs, fontWeight: 'bold',
-      background: bg, border: `1px solid ${border}`,
-      color, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5,
-    }}>
-      <span>{isHumanPlayer(pos) ? '👤' : '🤖'}</span>
-      <span>{getName(pos)}{isPlaying(pos) ? ' …' : ''}</span>
+  // Italic serif player label — rendered directly on the felt
+  const playerLabel = (pos) => {
+    const active = isPlaying(pos);
+    return (
+      <div style={{
+        fontFamily: 'Georgia, serif', fontStyle: 'italic',
+        fontSize: `clamp(13px, 2.8vw, 19px)`,
+        color: active ? '#fde68a' : '#c8a86b',
+        textShadow: '0 2px 8px rgba(0,0,0,0.85)',
+        whiteSpace: 'nowrap', letterSpacing: '0.3px',
+        display: 'flex', alignItems: 'center', gap: 5,
+      }}>
+        {isHumanPlayer(pos) ? '' : <span style={{ fontSize: '0.75em', opacity: 0.7 }}>🤖</span>}
+        {getName(pos)}{active ? ' …' : ''}
+      </div>
+    );
+  };
+
+  // Info for overlays
+  const dealerName = state.dealer === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.dealer);
+
+  // Golden SVG corner ornament
+  const Corner = ({ top, left, right, bottom, rot }) => (
+    <div style={{ position: 'fixed', top, left, right, bottom, zIndex: 4, pointerEvents: 'none' }}>
+      <svg width="88" height="88" viewBox="0 0 88 88" style={{ display: 'block', transform: `rotate(${rot}deg)` }}>
+        <path d="M2 86 L2 18 Q2 2 18 2 L86 2" fill="none" stroke="#7a5c10" strokeWidth="3.5"/>
+        <path d="M6 86 L6 22 Q6 6 22 6 L86 6" fill="none" stroke="#c9a227" strokeWidth="1" opacity="0.55"/>
+        <circle cx="14" cy="14" r="10" fill="#5c3d08" stroke="#c9a227" strokeWidth="1.5"/>
+        <circle cx="14" cy="14" r="5"  fill="#c9a227" opacity="0.9"/>
+        <circle cx="14" cy="14" r="2"  fill="#5c3d08"/>
+        <circle cx="34" cy="8"  r="2.5" fill="#7a5c10"/>
+        <circle cx="8"  cy="34" r="2.5" fill="#7a5c10"/>
+        <circle cx="48" cy="6"  r="1.5" fill="#c9a227" opacity="0.5"/>
+        <circle cx="6"  cy="48" r="1.5" fill="#c9a227" opacity="0.5"/>
+      </svg>
     </div>
   );
-
-  // Header font scaling
-  const hdrScore = Math.max(14, Math.round(18 * Math.min(1, window.innerWidth / 600)));
-  const hdrLabel = Math.max(7, Math.round(9 * Math.min(1, window.innerWidth / 600)));
 
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'radial-gradient(ellipse at 50% 30%, #1b5e20 0%, #145214 40%, #0a3300 100%)',
+      background: 'radial-gradient(ellipse at 50% 45%, #1f5c28 0%, #164a1e 45%, #0c2e10 100%)',
       fontFamily: 'Georgia, serif', color: 'white',
-      display: 'flex', flexDirection: 'column', position: 'relative',
+      display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden',
     }}>
       {/* Felt texture */}
       <div style={{
-        position: 'fixed', inset: 0, pointerEvents: 'none',
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 3h1v1H1V3zm2-2h1v1H3V1z' fill='rgba(0,0,0,0.08)'/%3E%3C/svg%3E")`,
-        zIndex: 0,
+        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 3 L3 0 L6 3 L3 6 Z' fill='none' stroke='rgba(0,0,0,0.07)' stroke-width='0.5'/%3E%3C/svg%3E")`,
       }} />
 
-      {/* ── Header ── */}
-      <div style={{
-        position: 'relative', zIndex: 10,
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: `8px ${Math.max(8, Math.round(20 * Math.min(1, window.innerWidth / 600)))}px`,
-        background: 'rgba(0,0,0,0.35)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        flexWrap: 'nowrap', gap: 8,
-      }}>
-        <div style={{
-          fontSize: 'clamp(14px, 4vw, 22px)', fontWeight: 'bold', letterSpacing: 'clamp(2px, 1vw, 5px)',
-          background: 'linear-gradient(135deg, #fcd34d, #f59e0b)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          flexShrink: 0,
-        }}>SUECA</div>
+      {/* Golden corner ornaments */}
+      <Corner top={0} left={0}   rot={0}   />
+      <Corner top={0} right={0}  rot={90}  />
+      <Corner bottom={0} left={0}  rot={-90} />
+      <Corner bottom={0} right={0} rot={180} />
 
-        {/* Scores */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          {[
-            { label: tr.US, pts: state.roundPts[myTeam], wins: state.gamePts[myTeam], sets: state.setPts[myTeam], color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
-            { label: tr.THEM, pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], sets: state.setPts[1-myTeam], color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
-          ].map(({ label, pts, wins, sets, color, bg }, i) => (
-            <div key={i} style={{ padding: `4px ${Math.max(8, Math.round(14 * Math.min(1, window.innerWidth / 600)))}px`, borderRadius: 12, background: bg, border: `1px solid ${color}44`, textAlign: 'center', minWidth: Math.max(50, Math.round(70 * Math.min(1, window.innerWidth / 600))) }}>
-              <div style={{ fontSize: hdrLabel, color, letterSpacing: 2, marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: hdrScore, fontWeight: 'bold', color, lineHeight: 1 }}>{pts}</div>
-              <div style={{ fontSize: Math.max(7, Math.round(10 * Math.min(1, window.innerWidth / 600))), color: '#64748b', marginTop: 2 }}>
-                {'★'.repeat(wins)}{'☆'.repeat(Math.max(0, 4 - wins))}
-              </div>
-              {sets > 0 && (
-                <div style={{ fontSize: Math.max(6, Math.round(8 * Math.min(1, window.innerWidth / 600))), color: '#a78bfa', marginTop: 1, letterSpacing: 1 }}>
-                  {tr.setPtsLabel} {sets}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {state.trump !== null && (
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              padding: `4px ${Math.max(6, Math.round(12 * Math.min(1, window.innerWidth / 600)))}px`,
-              borderRadius: 10,
-              background: RED[state.trump] ? 'rgba(220,38,38,0.2)' : 'rgba(30,41,59,0.6)',
-              border: `1px solid ${RED[state.trump] ? '#dc2626' : '#64748b'}`,
-            }}>
-              <div style={{ fontSize: 'clamp(7px, 1.5vw, 9px)', color: '#94a3b8', letterSpacing: 1 }}>{tr.TRUMP}</div>
-              <div style={{ fontSize: 'clamp(16px, 4vw, 22px)', color: RED[state.trump] ? '#f87171' : '#e2e8f0', fontWeight: 'bold', lineHeight: 1 }}>
-                {S[state.trump]}
-              </div>
-            </div>
-          )}
-
-          {/* Dealer & Next-to-play badges */}
-          {state.phase !== 'welcome' && (() => {
-            const isMyTurn = state.phase === 'playing' && state.current === perspective;
-            const nextName = state.phase === 'playing'
-              ? (state.current === perspective ? 'Você' : getName(state.current))
-              : null;
-            const dealerName = state.dealer === perspective ? 'Você' : getName(state.dealer);
-            const badgeBase = { display: 'flex', flexDirection: 'column', alignItems: 'center',
-              padding: `3px ${Math.max(5, Math.round(9 * Math.min(1, window.innerWidth / 600)))}px`,
-              borderRadius: 8, minWidth: Math.max(40, Math.round(52 * Math.min(1, window.innerWidth / 600))) };
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <div style={{ ...badgeBase, background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.35)' }}>
-                  <div style={{ fontSize: 'clamp(6px, 1.2vw, 8px)', color: '#fbbf24', letterSpacing: 1 }}>{tr.DEALER}</div>
-                  <div style={{ fontSize: 'clamp(8px, 1.8vw, 11px)', color: '#fde68a', fontWeight: 'bold', lineHeight: 1.2, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {dealerName}
-                  </div>
-                </div>
-                {nextName && (
-                  <div style={{ ...badgeBase,
-                    background: isMyTurn ? 'rgba(34,197,94,0.2)' : 'rgba(148,163,184,0.1)',
-                    border: `1px solid ${isMyTurn ? 'rgba(34,197,94,0.6)' : 'rgba(148,163,184,0.2)'}`,
-                  }}>
-                    <div style={{ fontSize: 'clamp(6px, 1.2vw, 8px)', color: isMyTurn ? '#4ade80' : '#94a3b8', letterSpacing: 1 }}>{tr.NEXT}</div>
-                    <div style={{ fontSize: 'clamp(8px, 1.8vw, 11px)', color: isMyTurn ? '#86efac' : '#cbd5e1', fontWeight: 'bold', lineHeight: 1.2, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {nextName}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          <div style={{ fontSize: 'clamp(8px, 2vw, 10px)', color: '#64748b', textAlign: 'right', lineHeight: 1.6 }}>
-            {state.tricksLeft}<br />{tr.tricks}
-          </div>
-          {multiMode && (
-            <div style={{ fontSize: 'clamp(8px, 2vw, 10px)', color: '#475569', borderLeft: '1px solid #1e293b', paddingLeft: 8 }}>
-              {tr.room}<br /><span style={{ color: '#fcd34d', fontWeight: 'bold', letterSpacing: 2 }}>{roomId}</span>
-            </div>
-          )}
+      {/* ── SUECA logo — top left ── */}
+      <div style={{ position: 'fixed', top: 14, left: 100, zIndex: 10, pointerEvents: 'none' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <div style={{ fontSize: 'clamp(9px,1.8vw,12px)', color: '#c9a227', letterSpacing: 4, fontStyle: 'italic', opacity: 0.8 }}>✦ ✦ ✦</div>
+          <div style={{
+            fontSize: 'clamp(18px, 4vw, 28px)', fontWeight: 'bold', letterSpacing: 'clamp(3px, 1vw, 7px)',
+            background: 'linear-gradient(180deg, #fde68a 0%, #c9a227 50%, #f59e0b 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            textShadow: 'none', fontStyle: 'italic',
+          }}>SUECA</div>
+          <div style={{ fontSize: 'clamp(9px,1.8vw,12px)', color: '#c9a227', letterSpacing: 4, fontStyle: 'italic', opacity: 0.8 }}>✦ ✦ ✦</div>
         </div>
       </div>
+
+      {/* ── Portrait score panels — top centre ── */}
+      <div style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: 10 }}>
+        {[
+          { label: tr.US,   pts: state.roundPts[myTeam],     wins: state.gamePts[myTeam],     sets: state.setPts[myTeam]     },
+          { label: tr.THEM, pts: state.roundPts[1-myTeam],   wins: state.gamePts[1-myTeam],   sets: state.setPts[1-myTeam]   },
+        ].map(({ label, pts, wins, sets }, i) => (
+          <div key={i} style={{
+            background: 'linear-gradient(180deg, #2e1c08 0%, #1a0f04 100%)',
+            border: '2px solid #7a5c10',
+            borderRadius: 8,
+            padding: '5px 14px 7px',
+            textAlign: 'center',
+            boxShadow: '0 4px 18px rgba(0,0,0,0.7), inset 0 1px 0 rgba(201,162,39,0.25)',
+            minWidth: 68,
+          }}>
+            <div style={{ fontSize: 'clamp(7px,1.4vw,9px)', color: '#c9a227', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 1 }}>{label}</div>
+            <div style={{ fontSize: 'clamp(22px,5vw,32px)', fontWeight: 'bold', color: '#f5deb3', lineHeight: 1, fontFamily: 'Georgia, serif' }}>{pts}</div>
+            <div style={{ fontSize: 'clamp(8px,1.6vw,10px)', color: '#8B6B14', marginTop: 2, letterSpacing: 1 }}>
+              {'★'.repeat(wins)}{'☆'.repeat(Math.max(0, 4 - wins))}
+            </div>
+            {sets > 0 && <div style={{ fontSize: 8, color: '#a78bfa', marginTop: 1, letterSpacing: 1 }}>{tr.setPtsLabel} {sets}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Wooden trump + dealer plaque — top right ── */}
+      {state.trump !== null && (() => {
+        const isMyTurn = state.phase === 'playing' && state.current === perspective;
+        const nextName = state.phase === 'playing'
+          ? (state.current === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.current))
+          : null;
+        return (
+          <div style={{
+            position: 'fixed', top: 8, right: 96, zIndex: 10,
+            background: 'linear-gradient(135deg, #5c3317 0%, #3d1f0a 60%, #4a2810 100%)',
+            border: '2px solid #7a5c10',
+            borderRadius: 10,
+            padding: '8px 12px 8px 8px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.75), inset 0 1px 0 rgba(201,162,39,0.18)',
+          }}>
+            {state.trumpCard && <Card card={state.trumpCard} small scale={Math.min(scale, 0.9)} />}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontSize: 'clamp(8px,1.6vw,10px)', color: '#c9a227', letterSpacing: 1 }}>
+                {tr.DEALER}: <span style={{ color: '#f5deb3', fontWeight: 'bold' }}>{dealerName}</span>
+              </div>
+              <div style={{ fontSize: 'clamp(8px,1.6vw,10px)', color: '#c9a227', letterSpacing: 1 }}>
+                {tr.TRUMP}: <span style={{ color: RED[state.trump] ? '#f87171' : '#f5deb3', fontWeight: 'bold', fontSize: '1.2em' }}>{S[state.trump]}</span>
+              </div>
+              {nextName && (
+                <div style={{ fontSize: 'clamp(7px,1.4vw,9px)', color: isMyTurn ? '#86efac' : '#94a3b8', letterSpacing: 1, marginTop: 1 }}>
+                  {tr.NEXT}: <span style={{ fontWeight: 'bold' }}>{nextName}</span>
+                </div>
+              )}
+              {multiMode && roomId && (
+                <div style={{ fontSize: 8, color: '#7a5c10', letterSpacing: 2, marginTop: 1 }}>{roomId}</div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Table ── */}
       <div style={{
         flex: 1, position: 'relative', zIndex: 5,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'space-between',
-        padding: `${Math.round(16 * scale)}px ${Math.round(12 * scale)}px`,
-        gap: Math.round(8 * scale),
+        padding: `${Math.round(20 * scale)}px ${Math.round(14 * scale)}px ${Math.round(12 * scale)}px`,
+        gap: Math.round(6 * scale),
       }}>
 
-        {/* Floating trump card near dealer */}
-        {trumpCardHeld && (
-          <div style={{ position: 'absolute', zIndex: 20, pointerEvents: 'none', ...trumpPos }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-              <div style={{ fontSize: Math.max(7, Math.round(9 * scale)), color: '#fcd34d', letterSpacing: 1, textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                {tr.trumpLabel}
-              </div>
-              <Card card={state.trumpCard} small scale={scale} />
-            </div>
-          </div>
-        )}
-
         {/* Top player (partner) */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale) }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(4 * scale), marginTop: Math.round(40 * scale) }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(6 * scale) }}>
             {multiMode && <VideoTile stream={rtc.remoteStreams[topPos]} scale={scale} />}
-            {playerLabel(topPos, '#86efac', 'rgba(34,197,94,0.15)', 'rgba(34,197,94,0.3)')}
+            {playerLabel(topPos)}
           </div>
           <NorthHand count={state.hands[topPos].length} scale={scale} />
         </div>
@@ -1550,46 +1548,51 @@ export default function Sueca() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: middleGap, width: '100%' }}>
           {/* Left */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale), minWidth: sideMinW }}>
-            {playerLabel(leftPos, '#fca5a5', 'rgba(239,68,68,0.15)', 'rgba(239,68,68,0.3)')}
+            {playerLabel(leftPos)}
             {multiMode && <VideoTile stream={rtc.remoteStreams[leftPos]} scale={scale} />}
             <SideHand count={state.hands[leftPos].length} side="left" scale={scale} />
           </div>
 
-          {/* Center trick area */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(12 * scale) }}>
-            <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: Math.round(16 * scale), border: '1px solid rgba(255,255,255,0.06)', padding: trickPad }}>
-              <TrickArea
-                trick={state.trick}
-                trickWinner={state.phase === 'resolving' ? state.trickWinner : null}
-                perspective={perspective}
-                scale={scale}
-              />
-            </div>
+          {/* Center trick area — no box, just cards on the felt */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <TrickArea
+              trick={state.trick}
+              trickWinner={state.phase === 'resolving' ? state.trickWinner : null}
+              perspective={perspective}
+              scale={scale}
+              trumpCard={trumpCardHeld ? state.trumpCard : null}
+              trumpLabel={tr.trumpLabel}
+            />
           </div>
 
           {/* Right */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale), minWidth: sideMinW }}>
-            {playerLabel(rightPos, '#fca5a5', 'rgba(239,68,68,0.15)', 'rgba(239,68,68,0.3)')}
+            {playerLabel(rightPos)}
             {multiMode && <VideoTile stream={rtc.remoteStreams[rightPos]} scale={scale} />}
             <SideHand count={state.hands[rightPos].length} side="right" scale={scale} />
           </div>
         </div>
 
-        {/* Message bar */}
+        {/* Message bar — golden pill */}
         <div style={{
-          padding: `${Math.round(8 * scale)}px ${Math.round(20 * scale)}px`,
-          borderRadius: 20, maxWidth: Math.round(480 * scale), width: '100%',
-          background: isYourTurn ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.3)',
-          border: `1px solid ${isYourTurn ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.08)'}`,
-          fontSize: msgFs, color: isYourTurn ? '#86efac' : '#94a3b8',
+          padding: `${Math.round(7 * scale)}px ${Math.round(28 * scale)}px`,
+          borderRadius: 30,
+          maxWidth: Math.round(460 * scale), width: '100%',
+          background: isYourTurn
+            ? 'linear-gradient(135deg, rgba(201,162,39,0.3) 0%, rgba(120,90,10,0.4) 100%)'
+            : 'rgba(0,0,0,0.35)',
+          border: `1px solid ${isYourTurn ? 'rgba(201,162,39,0.7)' : 'rgba(255,255,255,0.07)'}`,
+          boxShadow: isYourTurn ? '0 2px 16px rgba(201,162,39,0.25)' : 'none',
+          fontSize: msgFs, color: isYourTurn ? '#fde68a' : '#a08050',
           textAlign: 'center', transition: 'all 0.3s',
+          fontStyle: 'italic', letterSpacing: '0.3px',
         }}>
-          {isYourTurn ? '✨ Sua vez!' : state.msg}
-          {isYourTurn && sel && ' · Clique novamente para jogar!'}
+          {isYourTurn ? `✦ ${lang === 'pt' ? 'Sua vez!' : 'Your turn!'}` : state.msg}
+          {isYourTurn && sel && (lang === 'pt' ? ' · Clique novamente para jogar!' : ' · Click again to play!')}
         </div>
 
         {/* Your hand */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(8 * scale) }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale) }}>
           <div style={{ position: 'relative', overflow: 'visible', width: '100%', display: 'flex', justifyContent: 'center' }}>
             <PlayerHand
               hand={state.hands[perspective]}
@@ -1602,30 +1605,39 @@ export default function Sueca() {
               onReorder={(from, to) => dispatch({ type: 'REORDER_HAND', from, to, pi: perspective })}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * scale), flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(10 * scale), flexWrap: 'wrap', justifyContent: 'center' }}>
             {multiMode && rtc.localStream && (
               <VideoTile stream={rtc.localStream} muted mirror scale={scale} />
             )}
+            {/* Player name — italic serif on felt */}
             <div style={{
-              padding: `${Math.round(4 * scale)}px ${Math.round(20 * scale)}px`,
-              borderRadius: 20, fontSize: labelFs, fontWeight: 'bold',
-              background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)',
-              color: '#86efac', display: 'flex', alignItems: 'center', gap: Math.round(6 * scale),
+              fontFamily: 'Georgia, serif', fontStyle: 'italic',
+              fontSize: `clamp(14px, 3vw, 20px)`,
+              color: '#c8a86b',
+              textShadow: '0 2px 8px rgba(0,0,0,0.85)',
             }}>
-              <span>👤</span>
-              <span>{getName(perspective)} {isYourTurn ? '← sua vez!' : ''}</span>
+              {getName(perspective)}
             </div>
+            {/* Auto Ordenar — wooden button */}
             <button
               onClick={() => dispatch({ type: 'AUTO_ORDER_HAND', pi: perspective })}
               style={{
-                padding: `${Math.round(4 * scale)}px ${Math.round(14 * scale)}px`,
-                borderRadius: 20, fontSize: labelFs, fontWeight: 'bold',
-                background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)',
-                color: '#fcd34d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: Math.round(5 * scale),
+                padding: `${Math.round(5 * scale)}px ${Math.round(16 * scale)}px`,
+                borderRadius: 24, fontSize: labelFs, fontWeight: 'bold',
+                background: 'linear-gradient(135deg, #6b3f1a 0%, #4a2810 60%, #5c3317 100%)',
+                border: '2px solid #7a5c10',
+                color: '#fde68a', cursor: 'pointer',
+                fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '0.5px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(201,162,39,0.2)',
+                display: 'flex', alignItems: 'center', gap: Math.round(5 * scale),
               }}
             >
-              ✦ Auto Ordenar
+              ✦ {lang === 'pt' ? 'Auto Ordenar' : 'Auto Sort'}
             </button>
+            {/* Tricks left */}
+            <div style={{ fontSize: 'clamp(9px,1.8vw,11px)', color: '#7a5c10', textAlign: 'center', fontStyle: 'italic' }}>
+              {state.tricksLeft} {tr.tricks}
+            </div>
           </div>
         </div>
       </div>
