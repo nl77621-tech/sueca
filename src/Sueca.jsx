@@ -585,7 +585,7 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard =
 };
 
 // ═══════════════════════════════════════════
-// LOBBY SCREEN
+// LOBBY SCREEN — Visual Card Table
 // ═══════════════════════════════════════════
 const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
                  onAddBot, onRemoveBot,
@@ -593,97 +593,136 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
                  audioEnabled, videoEnabled, onToggleAudio, onToggleVideo, lang }) => {
   const tr = T[lang];
   const gameUrl = `${window.location.origin}/?room=${roomId}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(gameUrl)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(gameUrl)}&color=c9a227&bgcolor=0a0a0a`;
   const [copied, setCopied] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
 
   const copyLink = () => {
     navigator.clipboard.writeText(gameUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   };
 
-  // Seat metadata: position → { label, icon, teamColor, teamLabel }
-  const seats = [
-    { pos: 0, label: tr.south, dir: '↓', team: 0, teamName: tr.teamA, teamColor: '#60a5fa' },
-    { pos: 1, label: tr.west,  dir: '←', team: 1, teamName: tr.teamB, teamColor: '#f472b6' },
-    { pos: 2, label: tr.north, dir: '↑', team: 0, teamName: tr.teamA, teamColor: '#60a5fa' },
-    { pos: 3, label: tr.east,  dir: '→', team: 1, teamName: tr.teamB, teamColor: '#f472b6' },
+  const isCreator = myPosition === 0;
+  const readyCount = players.filter(p => p.connected || p.isBot).length;
+  const allReady = readyCount === 4;
+
+  // Seat configs — positioned around the table
+  const seatMeta = [
+    { pos: 0, label: tr.south, team: 0 },
+    { pos: 1, label: tr.west,  team: 1 },
+    { pos: 2, label: tr.north, team: 0 },
+    { pos: 3, label: tr.east,  team: 1 },
   ];
 
-  // Group by team for display
-  const teamA = seats.filter(s => s.team === 0); // Sul + Norte
-  const teamB = seats.filter(s => s.team === 1); // Oeste + Este
+  // Colors
+  const G = {
+    bg: '#0a0a0a', surface: '#111', card: '#161616', cardHover: '#1a1a1a',
+    gold: '#c9a227', goldBrt: '#e8c84a', goldDim: 'rgba(201,162,39,0.08)',
+    goldBrd: 'rgba(201,162,39,0.25)', goldGlow: 'rgba(201,162,39,0.15)',
+    green: '#22c55e', greenDim: 'rgba(34,197,94,0.12)',
+    red: '#ef4444', redDim: 'rgba(239,68,68,0.12)',
+    purple: '#8b5cf6', purpleDim: 'rgba(139,92,246,0.12)', purpleBrd: 'rgba(139,92,246,0.3)',
+    t1: '#f5f0e8', t2: '#8a7e6b', t3: '#3d3528', t4: '#252015',
+    font: "'Inter','Segoe UI',system-ui,sans-serif",
+  };
 
-  const isCreator = myPosition === 0;
-
-  const SeatCard = ({ seat }) => {
-    const occupant = players.find(p => p.position === seat.pos);
-    const isMe = seat.pos === myPosition;
+  // ── Individual seat chip ──
+  const SeatChip = ({ meta }) => {
+    const occupant = players.find(p => p.position === meta.pos);
+    const isMe = meta.pos === myPosition;
     const isEmpty = !occupant;
     const isBot = occupant?.isBot;
-    const canSit = isEmpty && !isMe;
+    const canSit = isEmpty && myPosition !== meta.pos;
     const canAddBot = isEmpty && isCreator;
     const canRemoveBot = isBot && isCreator;
+    const teamColor = meta.team === 0 ? G.gold : G.purple;
+    const teamDim = meta.team === 0 ? G.goldDim : G.purpleDim;
+    const teamBrd = meta.team === 0 ? G.goldBrd : G.purpleBrd;
 
     return (
-      <div
-        onClick={() => canSit && onChangeSeat(seat.pos)}
-        style={{
-          padding: '10px 14px', borderRadius: 12,
-          background: isMe
-            ? `rgba(${seat.team === 0 ? '96,165,250' : '244,114,182'},0.2)`
-            : isBot ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${isMe ? seat.teamColor : isBot ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.1)'}`,
-          cursor: canSit ? 'pointer' : 'default',
-          transition: 'all 0.2s',
-          minWidth: 130,
-        }}
+      <div style={{
+        width: '100%', maxWidth: 200,
+        background: isMe ? teamDim : G.card,
+        border: `1.5px solid ${isMe ? teamColor : isEmpty ? G.t4 : isBot ? G.purpleBrd : 'rgba(255,255,255,0.06)'}`,
+        borderRadius: 14, padding: '10px 12px',
+        cursor: canSit ? 'pointer' : 'default',
+        transition: 'all 0.25s cubic-bezier(.4,0,.2,1)',
+        position: 'relative', overflow: 'hidden',
+      }}
+        onClick={() => canSit && onChangeSeat(meta.pos)}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span style={{ fontSize: 11, color: seat.teamColor, fontWeight: 'bold' }}>
-            {seat.label} {seat.dir}
-          </span>
-          {isMe && <span style={{ fontSize: 9, color: '#fcd34d', letterSpacing: 1 }}>{tr.youLabel}</span>}
-          {occupant && !isMe && !isBot && (
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: occupant.connected ? '#22c55e' : '#475569' }} />
+        {/* Subtle team indicator stripe */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+          background: isMe ? teamColor : occupant ? `${teamColor}66` : 'transparent',
+        }} />
+
+        {/* Header row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: occupant || canAddBot ? 6 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontSize: 10, color: teamColor, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              {meta.label}
+            </span>
+            {meta.team === 0 && <span style={{ fontSize: 8, color: G.t3 }}>A</span>}
+            {meta.team === 1 && <span style={{ fontSize: 8, color: G.t3 }}>B</span>}
+          </div>
+          {isMe && (
+            <span style={{
+              fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: G.gold,
+              background: 'rgba(201,162,39,0.12)', padding: '1px 6px', borderRadius: 4,
+            }}>{tr.youLabel}</span>
           )}
-          {isBot && <span style={{ fontSize: 9, color: '#a78bfa', letterSpacing: 1 }}>BOT</span>}
+          {occupant && !isMe && !isBot && (
+            <div style={{
+              width: 7, height: 7, borderRadius: '50%',
+              background: occupant.connected ? G.green : '#555',
+              boxShadow: occupant.connected ? `0 0 6px ${G.green}` : 'none',
+            }} />
+          )}
+          {isBot && (
+            <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: '0.1em', color: G.purple,
+              background: G.purpleDim, padding: '1px 6px', borderRadius: 4 }}>BOT</span>
+          )}
         </div>
+
+        {/* Content */}
         {occupant ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {isBot && <span style={{ fontSize: 14 }}>🤖</span>}
-            <div style={{ fontSize: 13, color: isBot ? '#c4b5fd' : 'white', fontWeight: isMe ? 'bold' : 'normal', flex: 1 }}>
-              {occupant.name}
-            </div>
-            {isMe && localStream && (
-              <VideoTile stream={localStream} muted mirror scale={0.55} />
-            )}
+            {isBot && <span style={{ fontSize: 15, lineHeight: 1 }}>🤖</span>}
+            <span style={{
+              fontSize: 13, fontWeight: isMe ? 700 : 500,
+              color: isBot ? '#c4b5fd' : G.t1,
+              flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{occupant.name}</span>
+            {isMe && localStream && <VideoTile stream={localStream} muted mirror scale={0.4} />}
             {canRemoveBot && (
-              <button
-                onClick={e => { e.stopPropagation(); onRemoveBot(seat.pos); }}
+              <button onClick={e => { e.stopPropagation(); onRemoveBot(meta.pos); }}
                 style={{
-                  padding: '2px 8px', borderRadius: 8, border: 'none',
-                  background: 'rgba(239,68,68,0.2)', color: '#fca5a5',
-                  cursor: 'pointer', fontSize: 11,
-                }}
-              >{tr.removeBot}</button>
+                  padding: '2px 6px', borderRadius: 6, border: 'none', fontSize: 10,
+                  background: G.redDim, color: '#fca5a5', cursor: 'pointer', flexShrink: 0,
+                }}>✕</button>
             )}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             {canSit && (
-              <span style={{ fontSize: 12, color: '#64748b' }}>{tr.sitHere}</span>
+              <div style={{
+                flex: 1, fontSize: 11, color: G.t2,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <span style={{ fontSize: 14, opacity: 0.4 }}>+</span> {tr.sitHere}
+              </div>
             )}
             {canAddBot && (
-              <button
-                onClick={e => { e.stopPropagation(); onAddBot(); }}
+              <button onClick={e => { e.stopPropagation(); onAddBot(); }}
                 style={{
-                  padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(139,92,246,0.4)',
-                  background: 'rgba(139,92,246,0.15)', color: '#c4b5fd',
-                  cursor: 'pointer', fontSize: 12, width: '100%',
-                }}
-              >{tr.addBot}</button>
+                  padding: '3px 8px', borderRadius: 6,
+                  border: `1px solid ${G.purpleBrd}`, background: G.purpleDim,
+                  color: '#c4b5fd', cursor: 'pointer', fontSize: 10, flexShrink: 0,
+                  fontFamily: G.font, fontWeight: 500,
+                }}>🤖 Bot</button>
             )}
             {!canSit && !canAddBot && (
-              <span style={{ fontSize: 12, color: '#475569' }}>{tr.waiting}</span>
+              <span style={{ fontSize: 11, color: G.t3 }}>{tr.waiting}</span>
             )}
           </div>
         )}
@@ -691,149 +730,238 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
     );
   };
 
-  const TeamColumn = ({ seats: teamSeats, label, color }) => (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}33`,
-      borderRadius: 16, padding: '14px 16px', flex: 1, minWidth: 150,
-    }}>
-      <div style={{ fontSize: 10, color, letterSpacing: 2, marginBottom: 10, textAlign: 'center' }}>
-        {label}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {teamSeats.map(seat => <SeatCard key={seat.pos} seat={seat} />)}
-      </div>
-    </div>
-  );
-
   return (
     <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(160deg, #0c1445 0%, #1a237e 40%, #0d47a1 70%, #0c2461 100%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'Georgia, serif', color: 'white', padding: 20, gap: 20,
+      minHeight: '100dvh',
+      background: `radial-gradient(ellipse at 50% 40%, #1a1408 0%, ${G.bg} 60%)`,
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      fontFamily: G.font, color: G.t1,
+      padding: '0 16px env(safe-area-inset-bottom, 16px)',
+      overflowY: 'auto',
+      touchAction: 'manipulation',
     }}>
-      {/* Room code */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 11, letterSpacing: 6, color: '#90caf9', marginBottom: 4 }}>{tr.gameRoom}</div>
-        <div style={{
-          fontSize: 'clamp(40px, 10vw, 60px)', fontWeight: 'bold', letterSpacing: 14,
-          background: 'linear-gradient(135deg, #fcd34d, #f59e0b)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        }}>{roomId}</div>
-        <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
-          {tr.chooseSeat}
-        </div>
-      </div>
-
-      {/* Teams side by side */}
-      <div style={{ display: 'flex', gap: 12, width: '100%', maxWidth: 520, alignItems: 'stretch' }}>
-        <TeamColumn seats={teamA} label={tr.teamA} color="#60a5fa" />
-        <TeamColumn seats={teamB} label={tr.teamB} color="#f472b6" />
-      </div>
-
-      {/* QR + link row */}
-      <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-          <img src={qrUrl} alt="QR Code" style={{ borderRadius: 10, border: '2px solid rgba(255,255,255,0.12)', width: 'min(120px, 30vw)', height: 'min(120px, 30vw)' }} />
-          <div style={{ fontSize: 10, color: '#475569' }}>{tr.scanQr}</div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
-          <div style={{
-            background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8, padding: '6px 12px', fontSize: 10, color: '#64748b',
-            wordBreak: 'break-all', textAlign: 'center', maxWidth: 240,
-          }}>{gameUrl}</div>
-          <button onClick={copyLink} style={{
-            padding: '8px 20px', borderRadius: 30, border: '1px solid rgba(255,255,255,0.2)',
-            background: copied ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)',
-            color: copied ? '#86efac' : 'white', cursor: 'pointer', fontSize: 12,
-            fontFamily: 'Georgia, serif',
-          }}>
-            {copied ? tr.copied : tr.copyLink}
-          </button>
-        </div>
-      </div>
-
-      {/* Media controls */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-        <div style={{ fontSize: 10, color: '#475569', letterSpacing: 1 }}>{tr.liveAV}</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button
-            onClick={() => localStream
-              ? onDisableMedia()
-              : onEnableMedia(true).catch(() => onEnableMedia(false).catch(() => {}))}
-            style={{
-              padding: '8px 18px', borderRadius: 30, cursor: 'pointer', fontSize: 12,
-              fontFamily: 'Georgia, serif',
-              background: localStream ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.07)',
-              border: `1px solid ${localStream ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.2)'}`,
-              color: localStream ? '#86efac' : '#94a3b8',
-            }}>
-            {localStream ? tr.cameraOn : tr.cameraEnable}
-          </button>
-          {localStream && (<>
-            <button onClick={onToggleAudio} title={audioEnabled ? tr.muteBtn : tr.unmuteBtn} style={{
-              width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 15,
-              background: audioEnabled ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-              color: audioEnabled ? '#86efac' : '#fca5a5',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>{audioEnabled ? '🎤' : '🔇'}</button>
-            {localStream.getVideoTracks().length > 0 && (
-              <button onClick={onToggleVideo} title={videoEnabled ? tr.videoOff : tr.videoOn} style={{
-                width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 15,
-                background: videoEnabled ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-                color: videoEnabled ? '#86efac' : '#fca5a5',
+      {/* ── Top bar ── */}
+      <div style={{
+        width: '100%', maxWidth: 480,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 0 8px', flexShrink: 0,
+      }}>
+        <button onClick={onLeave} style={{
+          background: 'none', border: 'none', color: G.t2, fontSize: 13,
+          cursor: 'pointer', fontFamily: G.font, padding: '4px 0',
+        }}>← {lang === 'pt' ? 'Sair' : 'Leave'}</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {localStream ? (
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={onToggleAudio} style={{
+                width: 28, height: 28, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 12,
+                background: audioEnabled ? G.greenDim : G.redDim,
+                color: audioEnabled ? '#86efac' : '#fca5a5',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>{videoEnabled ? '🎥' : '📵'}</button>
-            )}
-          </>)}
+              }}>{audioEnabled ? '🎤' : '🔇'}</button>
+              {localStream.getVideoTracks().length > 0 && (
+                <button onClick={onToggleVideo} style={{
+                  width: 28, height: 28, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 12,
+                  background: videoEnabled ? G.greenDim : G.redDim,
+                  color: videoEnabled ? '#86efac' : '#fca5a5',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>{videoEnabled ? '📷' : '📵'}</button>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => onEnableMedia(true).catch(() => onEnableMedia(false).catch(() => {}))}
+              style={{
+                padding: '4px 10px', borderRadius: 8, fontSize: 11,
+                background: 'rgba(255,255,255,0.04)', border: `1px solid ${G.t4}`,
+                color: G.t2, cursor: 'pointer', fontFamily: G.font,
+              }}>📷 {lang === 'pt' ? 'Câmara' : 'Camera'}</button>
+          )}
         </div>
-        {!localStream && (
-          <div style={{ fontSize: 10, color: '#334155', textAlign: 'center' }}>
-            {tr.cameraHint}
+      </div>
+
+      {/* ── Room code hero ── */}
+      <div style={{
+        textAlign: 'center', padding: '12px 0 16px', flexShrink: 0,
+      }}>
+        <div style={{
+          fontSize: 9, letterSpacing: '0.3em', color: G.t3,
+          textTransform: 'uppercase', marginBottom: 6,
+        }}>{tr.room}</div>
+        <div style={{
+          fontSize: 'clamp(44px, 12vw, 64px)',
+          fontWeight: 800, letterSpacing: '0.2em',
+          background: `linear-gradient(135deg, ${G.goldBrt}, ${G.gold})`,
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          filter: `drop-shadow(0 0 24px ${G.goldGlow})`,
+          lineHeight: 1.1,
+        }}>{roomId}</div>
+      </div>
+
+      {/* ── Visual table with seats ── */}
+      <div style={{
+        position: 'relative',
+        width: '100%', maxWidth: 380,
+        aspectRatio: '1 / 1.05',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        {/* The table surface */}
+        <div style={{
+          position: 'absolute',
+          width: '70%', height: '60%',
+          top: '20%', left: '15%',
+          borderRadius: '50%',
+          background: `radial-gradient(ellipse at 50% 45%, #1c1a10 0%, #121008 60%, ${G.bg} 100%)`,
+          border: `1.5px solid ${G.goldBrd}`,
+          boxShadow: `0 0 60px ${G.goldGlow}, inset 0 0 40px rgba(0,0,0,0.5)`,
+        }}>
+          {/* Centre decoration — suits */}
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%,-50%)',
+            display: 'flex', gap: 6, opacity: 0.15, fontSize: 22,
+          }}>
+            <span>♠</span><span style={{ color: '#c44' }}>♥</span>
+            <span style={{ color: '#c44' }}>♦</span><span>♣</span>
+          </div>
+          {/* Player count badge */}
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%, calc(-50% + 24px))',
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            {[0,1,2,3].map(i => (
+              <div key={i} style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: i < readyCount ? G.gold : G.t4,
+                transition: 'background 0.3s',
+                boxShadow: i < readyCount ? `0 0 6px ${G.goldGlow}` : 'none',
+              }} />
+            ))}
+          </div>
+        </div>
+
+        {/* ── Seat: North (top) ── */}
+        <div style={{
+          position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+        }}>
+          <SeatChip meta={seatMeta[2]} />
+        </div>
+
+        {/* ── Seat: South (bottom) ── */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+        }}>
+          <SeatChip meta={seatMeta[0]} />
+        </div>
+
+        {/* ── Seat: West (left) ── */}
+        <div style={{
+          position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+        }}>
+          <SeatChip meta={seatMeta[1]} />
+        </div>
+
+        {/* ── Seat: East (right) ── */}
+        <div style={{
+          position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
+        }}>
+          <SeatChip meta={seatMeta[3]} />
+        </div>
+
+        {/* Team lines — dashed arcs connecting teammates */}
+        <svg style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
+          viewBox="0 0 380 399" fill="none">
+          {/* Team A (N-S) line */}
+          <line x1="190" y1="75" x2="190" y2="325" stroke={G.gold} strokeWidth="0.5" strokeDasharray="4 6" opacity="0.15" />
+          {/* Team B (W-E) line */}
+          <line x1="55" y1="200" x2="325" y2="200" stroke={G.purple} strokeWidth="0.5" strokeDasharray="4 6" opacity="0.15" />
+        </svg>
+      </div>
+
+      {/* ── Invite & share section — collapsible ── */}
+      <div style={{ width: '100%', maxWidth: 380, marginTop: 8, flexShrink: 0 }}>
+        <button onClick={() => setShowInvite(p => !p)} style={{
+          width: '100%', padding: '10px 14px', borderRadius: 12,
+          background: G.card, border: `1px solid ${G.t4}`,
+          color: G.t2, cursor: 'pointer', fontFamily: G.font, fontSize: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span>🔗 {lang === 'pt' ? 'Convidar jogadores' : 'Invite players'}</span>
+          <span style={{ fontSize: 10, transform: showInvite ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+        </button>
+        {showInvite && (
+          <div style={{
+            marginTop: 6, padding: 14, borderRadius: 12,
+            background: G.card, border: `1px solid ${G.t4}`,
+            display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center',
+          }}>
+            <img src={qrUrl} alt="QR" style={{
+              borderRadius: 8, width: 100, height: 100,
+              border: `1px solid ${G.t4}`,
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 140 }}>
+              <div style={{
+                fontSize: 10, color: G.t3, wordBreak: 'break-all',
+                padding: '6px 8px', borderRadius: 6,
+                background: 'rgba(255,255,255,0.03)', border: `1px solid ${G.t4}`,
+              }}>{gameUrl}</div>
+              <button onClick={copyLink} style={{
+                padding: '7px 0', borderRadius: 8, border: 'none',
+                background: copied ? G.greenDim : `rgba(201,162,39,0.1)`,
+                color: copied ? '#86efac' : G.gold,
+                cursor: 'pointer', fontSize: 12, fontFamily: G.font, fontWeight: 600,
+              }}>{copied ? '✓' : '🔗'} {copied ? (lang === 'pt' ? 'Copiado!' : 'Copied!') : (lang === 'pt' ? 'Copiar Link' : 'Copy Link')}</button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Action buttons */}
-      {(() => {
-        const readyCount = players.filter(p => p.connected || p.isBot).length;
-        const allReady = readyCount === 4;
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            {!allReady && (
-              <div style={{ fontSize: 12, color: '#64748b', letterSpacing: 1 }}>
-                {lang === 'pt'
-                  ? `À espera de jogadores… ${readyCount}/4`
-                  : `Waiting for players… ${readyCount}/4`}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+      {/* ── Bottom action area ── */}
+      <div style={{
+        width: '100%', maxWidth: 380,
+        padding: '16px 0 24px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+        flexShrink: 0,
+      }}>
+        {/* Progress text */}
+        {!allReady && (
+          <div style={{ fontSize: 12, color: G.t3, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              display: 'inline-block', width: 10, height: 10,
+              border: `2px solid ${G.gold}`, borderTop: '2px solid transparent',
+              borderRadius: '50%', animation: 'spin 1s linear infinite',
+            }} />
+            {lang === 'pt'
+              ? `À espera… ${readyCount}/4`
+              : `Waiting… ${readyCount}/4`}
+          </div>
+        )}
+
+        {/* Start game button */}
         <button onClick={allReady ? onStart : undefined} style={{
-          padding: '12px 36px', borderRadius: 30, border: 'none',
+          width: '100%', padding: '14px 0', borderRadius: 12, border: 'none',
           background: allReady
-            ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-            : 'rgba(255,255,255,0.08)',
-          color: allReady ? 'white' : '#475569',
-          fontWeight: 'bold', cursor: allReady ? 'pointer' : 'not-allowed', fontSize: 14,
-          fontFamily: 'Georgia, serif', letterSpacing: 2,
-          boxShadow: allReady ? '0 4px 20px rgba(245,158,11,0.4)' : 'none',
+            ? `linear-gradient(135deg, ${G.gold}, #8a6010)`
+            : G.card,
+          color: allReady ? '#1a0f00' : G.t3,
+          fontWeight: 800, fontSize: 15, letterSpacing: '0.08em',
+          cursor: allReady ? 'pointer' : 'not-allowed',
+          fontFamily: G.font,
+          boxShadow: allReady ? `0 4px 24px ${G.goldGlow}` : 'none',
           transition: 'all 0.3s',
         }}>
-          {tr.startGame}
+          {allReady
+            ? (lang === 'pt' ? '▶  INICIAR JOGO' : '▶  START GAME')
+            : (lang === 'pt' ? `AGUARDAR JOGADORES (${readyCount}/4)` : `WAITING FOR PLAYERS (${readyCount}/4)`)}
         </button>
-        <button onClick={onLeave} style={{
-          padding: '12px 24px', borderRadius: 30,
-          border: '1px solid rgba(255,255,255,0.15)',
-          background: 'rgba(255,255,255,0.05)',
-          color: '#94a3b8', cursor: 'pointer', fontSize: 13, fontFamily: 'Georgia, serif',
-        }}>
-          {tr.leave}
-        </button>
-            </div>
-          </div>
-        );
-      })()}
+      </div>
+
+      {/* Keyframe for spinner */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
@@ -849,180 +977,186 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError, lang, 
   const [joinCode, setJoinCode] = useState(urlRoom || '');
   const [loading, setLoading] = useState(false);
 
+  const W = {
+    bg: '#0a0a0a', card: '#111', t1: '#f5f0e8', t2: '#8a7e6b', t3: '#3d3528', t4: '#252015',
+    gold: '#c9a227', goldBrt: '#e8c84a', goldDim: 'rgba(201,162,39,0.08)', goldBrd: 'rgba(201,162,39,0.25)',
+    goldGlow: 'rgba(201,162,39,0.15)',
+    green: '#22c55e', greenDim: 'rgba(34,197,94,0.12)',
+    font: "'Inter','Segoe UI',system-ui,sans-serif",
+  };
+
   const inputStyle = {
-    padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)',
-    background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 14,
-    fontFamily: 'Georgia, serif', outline: 'none', width: '100%',
+    padding: '11px 14px', borderRadius: 10,
+    border: `1px solid ${W.t4}`, background: 'rgba(255,255,255,0.04)',
+    color: W.t1, fontSize: 14, fontFamily: W.font, outline: 'none', width: '100%',
+    boxSizing: 'border-box',
   };
 
-  const handleCreate = () => {
-    if (!name.trim()) return;
-    setLoading(true);
-    onCreateRoom(name.trim());
-  };
-
-  const handleJoin = () => {
-    if (!name.trim() || !joinCode.trim()) return;
-    setLoading(true);
-    onJoinRoom(name.trim(), joinCode.trim().toUpperCase());
-  };
-
-  const LangToggle = () => (
-    <button onClick={onToggleLang} style={{
-      position: 'absolute', top: 16, right: 16,
-      padding: '6px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.2)',
-      background: 'rgba(255,255,255,0.08)', color: 'white', cursor: 'pointer',
-      fontSize: 12, fontFamily: 'Georgia, serif', letterSpacing: 1,
-      display: 'flex', alignItems: 'center', gap: 6,
-    }}>
-      <span style={{ opacity: lang === 'pt' ? 1 : 0.4 }}>PT</span>
-      <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
-      <span style={{ opacity: lang === 'en' ? 1 : 0.4 }}>EN</span>
-    </button>
-  );
+  const handleCreate = () => { if (!name.trim()) return; setLoading(true); onCreateRoom(name.trim()); };
+  const handleJoin = () => { if (!name.trim() || !joinCode.trim()) return; setLoading(true); onJoinRoom(name.trim(), joinCode.trim().toUpperCase()); };
 
   return (
     <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(160deg, #0c1445 0%, #1a237e 40%, #0d47a1 70%, #0c2461 100%)',
+      minHeight: '100dvh',
+      background: `radial-gradient(ellipse at 50% 30%, #1a1408 0%, ${W.bg} 60%)`,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'Georgia, serif', color: 'white', padding: 24,
+      fontFamily: W.font, color: W.t1, padding: 24,
       position: 'relative', overflow: 'hidden',
+      touchAction: 'manipulation',
     }}>
-      <LangToggle />
-      <div style={{ position: 'absolute', top: 40, left: 40, fontSize: 80, opacity: 0.06, pointerEvents: 'none' }}>♠</div>
-      <div style={{ position: 'absolute', top: 40, right: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♥</div>
-      <div style={{ position: 'absolute', bottom: 40, left: 40, fontSize: 80, opacity: 0.06, color: '#dc2626', pointerEvents: 'none' }}>♦</div>
-      <div style={{ position: 'absolute', bottom: 40, right: 40, fontSize: 80, opacity: 0.06, pointerEvents: 'none' }}>♣</div>
+      {/* Lang toggle */}
+      <button onClick={onToggleLang} style={{
+        position: 'absolute', top: 16, right: 16,
+        padding: '5px 12px', borderRadius: 8, border: `1px solid ${W.t4}`,
+        background: W.card, color: W.t2, cursor: 'pointer',
+        fontSize: 11, fontFamily: W.font, display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        <span style={{ color: lang === 'pt' ? W.gold : W.t3, fontWeight: lang === 'pt' ? 700 : 400 }}>PT</span>
+        <span style={{ color: W.t4 }}>|</span>
+        <span style={{ color: lang === 'en' ? W.gold : W.t3, fontWeight: lang === 'en' ? 700 : 400 }}>EN</span>
+      </button>
+
+      {/* Decorative suits — subtle */}
+      <div style={{ position: 'absolute', top: '10%', left: '8%', fontSize: 120, opacity: 0.03, pointerEvents: 'none', color: W.gold }}>♠</div>
+      <div style={{ position: 'absolute', bottom: '10%', right: '8%', fontSize: 120, opacity: 0.03, pointerEvents: 'none', color: W.gold }}>♦</div>
 
       {/* Title */}
-      <div style={{ textAlign: 'center', marginBottom: 36, position: 'relative' }}>
-        <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', letterSpacing: 8, color: '#90caf9', marginBottom: 8 }}>{tr.subtitle}</div>
+      <div style={{ textAlign: 'center', marginBottom: 40, position: 'relative' }}>
+        <div style={{ fontSize: 10, letterSpacing: '0.3em', color: W.t3, textTransform: 'uppercase', marginBottom: 8 }}>
+          {tr.subtitle}
+        </div>
         <h1 style={{
-          fontSize: 'clamp(52px, 15vw, 88px)', margin: 0, letterSpacing: 12, fontWeight: 'bold',
-          background: 'linear-gradient(135deg, #fcd34d, #f59e0b, #fbbf24)',
+          fontSize: 'clamp(52px, 15vw, 80px)', margin: 0, letterSpacing: '0.15em', fontWeight: 800,
+          background: `linear-gradient(135deg, ${W.goldBrt}, ${W.gold})`,
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          filter: 'drop-shadow(0 0 40px rgba(245,158,11,0.4))',
+          filter: `drop-shadow(0 0 30px ${W.goldGlow})`,
+          lineHeight: 1.1,
         }}>SUECA</h1>
-        <div style={{ fontSize: 'clamp(24px, 8vw, 36px)', letterSpacing: 20, marginTop: 4 }}>
-          <span>♠</span><span style={{ color: '#dc2626' }}>♥</span>
-          <span style={{ color: '#dc2626' }}>♦</span><span>♣</span>
+        <div style={{
+          fontSize: 'clamp(18px, 6vw, 28px)', letterSpacing: '0.4em', marginTop: 6,
+          opacity: 0.25, color: W.t1,
+        }}>
+          ♠ ♥ ♦ ♣
         </div>
       </div>
 
       {view === 'main' && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%', maxWidth: 360 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%', maxWidth: 340 }}>
           <button onClick={onSolo} style={{
-            width: '100%', padding: '16px 0', fontSize: 17, borderRadius: 50, border: 'none',
-            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-            color: 'white', fontWeight: 'bold', cursor: 'pointer',
-            letterSpacing: 3, fontFamily: 'Georgia, serif',
-            boxShadow: '0 4px 24px rgba(245,158,11,0.5)',
+            width: '100%', padding: '15px 0', fontSize: 15, borderRadius: 12, border: 'none',
+            background: `linear-gradient(135deg, ${W.gold}, #8a6010)`,
+            color: '#1a0f00', fontWeight: 800, cursor: 'pointer',
+            letterSpacing: '0.08em', fontFamily: W.font,
+            boxShadow: `0 4px 24px ${W.goldGlow}`,
           }}>{tr.playSolo}</button>
           <button onClick={() => setView('online')} style={{
-            width: '100%', padding: '14px 0', fontSize: 15, borderRadius: 50,
-            border: '1px solid rgba(255,255,255,0.3)',
-            background: 'rgba(255,255,255,0.08)',
-            color: 'white', cursor: 'pointer',
-            letterSpacing: 2, fontFamily: 'Georgia, serif',
+            width: '100%', padding: '14px 0', fontSize: 14, borderRadius: 12,
+            border: `1px solid ${W.t4}`, background: W.card,
+            color: W.t2, cursor: 'pointer', fontWeight: 600,
+            letterSpacing: '0.06em', fontFamily: W.font,
           }}>{tr.playOnline}</button>
-          <div style={{ fontSize: 11, color: '#475569', textAlign: 'center', marginTop: 8 }}>{tr.soloHint}</div>
+          <div style={{ fontSize: 11, color: W.t3, textAlign: 'center', marginTop: 6 }}>{tr.soloHint}</div>
         </div>
       )}
 
       {view === 'online' && (
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 640 }}>
-          {/* Create room */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 380 }}>
+          {/* Create room card */}
           <div style={{
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 16, padding: '24px 28px', flex: 1, minWidth: 240,
+            background: W.card, border: `1px solid ${W.t4}`,
+            borderRadius: 14, padding: '20px 20px',
           }}>
-            <div style={{ fontSize: 12, color: '#fcd34d', letterSpacing: 2, marginBottom: 16 }}>{tr.createRoom}</div>
-            <input
-              style={inputStyle} placeholder={tr.yourName} value={name}
+            <div style={{ fontSize: 10, color: W.gold, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12, fontWeight: 600 }}>
+              {tr.createRoom}
+            </div>
+            <input style={inputStyle} placeholder={tr.yourName} value={name}
               onChange={e => { setName(e.target.value); clearError(); }}
-              onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            />
+              onKeyDown={e => e.key === 'Enter' && handleCreate()} />
             <button onClick={handleCreate} disabled={loading || !name.trim()} style={{
-              marginTop: 12, width: '100%', padding: '11px 0', borderRadius: 30, border: 'none',
-              background: name.trim() ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(255,255,255,0.1)',
-              color: 'white', fontWeight: 'bold', cursor: name.trim() ? 'pointer' : 'default',
-              fontFamily: 'Georgia, serif', fontSize: 13, letterSpacing: 2,
+              marginTop: 10, width: '100%', padding: '11px 0', borderRadius: 10, border: 'none',
+              background: name.trim() ? `linear-gradient(135deg, ${W.gold}, #8a6010)` : W.t4,
+              color: name.trim() ? '#1a0f00' : W.t3, fontWeight: 700, cursor: name.trim() ? 'pointer' : 'default',
+              fontFamily: W.font, fontSize: 13, letterSpacing: '0.06em',
             }}>{loading ? tr.connecting : tr.createBtn}</button>
           </div>
 
-          {/* Join room */}
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1, height: 1, background: W.t4 }} />
+            <span style={{ fontSize: 10, color: W.t3, letterSpacing: '0.2em' }}>{lang === 'pt' ? 'OU' : 'OR'}</span>
+            <div style={{ flex: 1, height: 1, background: W.t4 }} />
+          </div>
+
+          {/* Join room card */}
           <div style={{
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 16, padding: '24px 28px', flex: 1, minWidth: 240,
+            background: W.card, border: `1px solid ${W.t4}`,
+            borderRadius: 14, padding: '20px 20px',
           }}>
-            <div style={{ fontSize: 12, color: '#86efac', letterSpacing: 2, marginBottom: 16 }}>{tr.joinRoom}</div>
+            <div style={{ fontSize: 10, color: W.green, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12, fontWeight: 600 }}>
+              {tr.joinRoom}
+            </div>
+            <input style={{ ...inputStyle, marginBottom: 8 }} placeholder={tr.yourName} value={name}
+              onChange={e => { setName(e.target.value); clearError(); }} />
             <input
-              style={{ ...inputStyle, marginBottom: 8 }} placeholder={tr.yourName} value={name}
-              onChange={e => { setName(e.target.value); clearError(); }}
-            />
-            <input
-              style={{ ...inputStyle, letterSpacing: 6, textTransform: 'uppercase', textAlign: 'center', fontSize: 18 }}
+              style={{ ...inputStyle, letterSpacing: '0.3em', textTransform: 'uppercase', textAlign: 'center', fontSize: 20, fontWeight: 700 }}
               placeholder="XXXX" maxLength={4} value={joinCode}
               onChange={e => { setJoinCode(e.target.value.toUpperCase()); clearError(); }}
-              onKeyDown={e => e.key === 'Enter' && handleJoin()}
-            />
+              onKeyDown={e => e.key === 'Enter' && handleJoin()} />
             <button onClick={handleJoin} disabled={loading || !name.trim() || !joinCode.trim()} style={{
-              marginTop: 12, width: '100%', padding: '11px 0', borderRadius: 30, border: 'none',
-              background: (name.trim() && joinCode.trim()) ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.1)',
-              color: 'white', fontWeight: 'bold',
-              cursor: (name.trim() && joinCode.trim()) ? 'pointer' : 'default',
-              fontFamily: 'Georgia, serif', fontSize: 13, letterSpacing: 2,
+              marginTop: 10, width: '100%', padding: '11px 0', borderRadius: 10, border: 'none',
+              background: (name.trim() && joinCode.trim()) ? W.greenDim : W.t4,
+              color: (name.trim() && joinCode.trim()) ? W.green : W.t3,
+              fontWeight: 700, cursor: (name.trim() && joinCode.trim()) ? 'pointer' : 'default',
+              fontFamily: W.font, fontSize: 13, letterSpacing: '0.06em',
+              border: (name.trim() && joinCode.trim()) ? `1px solid rgba(34,197,94,0.3)` : `1px solid ${W.t4}`,
             }}>{loading ? tr.connecting : tr.joinBtn}</button>
           </div>
 
           {wsError && (
             <div style={{
-              width: '100%', padding: '10px 16px', borderRadius: 10,
-              background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-              color: '#fca5a5', fontSize: 13, textAlign: 'center',
+              padding: '10px 14px', borderRadius: 10,
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+              color: '#fca5a5', fontSize: 12, textAlign: 'center',
             }}>{wsError}</div>
           )}
+
+          <button onClick={() => { setView('main'); clearError(); }} style={{
+            background: 'none', border: 'none', color: W.t3,
+            cursor: 'pointer', fontSize: 12, fontFamily: W.font, padding: '8px 0',
+          }}>← {tr.mainMenu}</button>
         </div>
       )}
 
       {view === 'join' && (
         <div style={{
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 16, padding: '24px 28px', width: '100%', maxWidth: 320,
+          background: W.card, border: `1px solid ${W.t4}`,
+          borderRadius: 14, padding: '24px 20px', width: '100%', maxWidth: 340,
         }}>
-          <div style={{ fontSize: 12, color: '#86efac', letterSpacing: 2, marginBottom: 4 }}>{tr.joinRoom}</div>
-          <div style={{ fontSize: 22, letterSpacing: 10, color: '#fcd34d', marginBottom: 16 }}>{urlRoom}</div>
-          <input
-            style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)',
-              background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 14,
-              fontFamily: 'Georgia, serif', outline: 'none', width: '100%' }}
-            placeholder={tr.yourName} value={name}
+          <div style={{ fontSize: 10, color: W.green, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 4, fontWeight: 600 }}>
+            {tr.joinRoom}
+          </div>
+          <div style={{
+            fontSize: 28, letterSpacing: '0.2em', fontWeight: 800, marginBottom: 16,
+            background: `linear-gradient(135deg, ${W.goldBrt}, ${W.gold})`,
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>{urlRoom}</div>
+          <input style={inputStyle} placeholder={tr.yourName} value={name}
             onChange={e => { setName(e.target.value); clearError(); }}
-            onKeyDown={e => e.key === 'Enter' && handleJoin()}
-            autoFocus
-          />
-          {wsError && (
-            <div style={{ marginTop: 8, color: '#fca5a5', fontSize: 12 }}>{wsError}</div>
-          )}
+            onKeyDown={e => e.key === 'Enter' && handleJoin()} autoFocus />
+          {wsError && <div style={{ marginTop: 8, color: '#fca5a5', fontSize: 12 }}>{wsError}</div>}
           <button onClick={handleJoin} disabled={loading || !name.trim()} style={{
-            marginTop: 12, width: '100%', padding: '12px 0', borderRadius: 30, border: 'none',
-            background: name.trim() ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.1)',
-            color: 'white', fontWeight: 'bold', cursor: name.trim() ? 'pointer' : 'default',
-            fontFamily: 'Georgia, serif', fontSize: 14, letterSpacing: 2,
+            marginTop: 12, width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
+            background: name.trim() ? W.greenDim : W.t4,
+            color: name.trim() ? W.green : W.t3,
+            fontWeight: 700, cursor: name.trim() ? 'pointer' : 'default',
+            fontFamily: W.font, fontSize: 14, letterSpacing: '0.06em',
+            border: name.trim() ? `1px solid rgba(34,197,94,0.3)` : `1px solid ${W.t4}`,
           }}>{loading ? tr.connecting : tr.joinBtn}</button>
           <button onClick={() => setView('main')} style={{
-            marginTop: 8, background: 'none', border: 'none', color: '#475569',
-            cursor: 'pointer', fontSize: 12, fontFamily: 'Georgia, serif', width: '100%',
-          }}>{tr.back}</button>
+            marginTop: 8, background: 'none', border: 'none', color: W.t3,
+            cursor: 'pointer', fontSize: 12, fontFamily: W.font, width: '100%',
+          }}>← {tr.back}</button>
         </div>
-      )}
-
-      {view !== 'main' && (
-        <button onClick={() => { setView('main'); clearError(); }} style={{
-          marginTop: 20, background: 'none', border: 'none', color: '#475569',
-          cursor: 'pointer', fontSize: 12, fontFamily: 'Georgia, serif',
-        }}>{tr.mainMenu}</button>
       )}
     </div>
   );
@@ -1361,16 +1495,21 @@ export default function Sueca() {
     if (isRejoining) {
       return (
         <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', background: 'linear-gradient(135deg,#1e3a2f 0%,#14532d 60%,#052e16 100%)',
-          color: '#fff', fontFamily: 'system-ui,sans-serif', gap: 20 }}>
-          <div style={{ fontSize: 48 }}>🃏</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{tr.rejoiningMsg}</div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>{tr.reconnecting}</div>
+          justifyContent: 'center', background: 'radial-gradient(ellipse at 50% 30%, #1a1408 0%, #0a0a0a 60%)',
+          color: '#f5f0e8', fontFamily: "'Inter','Segoe UI',system-ui,sans-serif", gap: 16 }}>
+          <div style={{
+            width: 14, height: 14, border: '2px solid #c9a227', borderTop: '2px solid transparent',
+            borderRadius: '50%', animation: 'spin 1s linear infinite',
+          }} />
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{tr.rejoiningMsg}</div>
+          <div style={{ fontSize: 13, color: '#3d3528' }}>{tr.reconnecting}</div>
           <button onClick={handleLeave}
-            style={{ marginTop: 12, padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
-              background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 14 }}>
+            style={{ marginTop: 8, padding: '8px 18px', borderRadius: 8, border: '1px solid #252015',
+              background: '#111', color: '#8a7e6b', cursor: 'pointer', fontSize: 13,
+              fontFamily: "'Inter',system-ui,sans-serif" }}>
             {tr.cancel}
           </button>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       );
     }
