@@ -1386,25 +1386,33 @@ export default function Sueca() {
     state.hands[state.dealer] &&
     state.hands[state.dealer].some(c => c.id === state.trumpCard.id);
 
-  // ── Design tokens ──
+  // ── Design tokens — Black & Gold ──
   const C = {
-    bg:       '#07101f',
-    surface:  '#0d1829',
-    surface2: '#111e30',
-    border:   'rgba(255,255,255,0.07)',
-    border2:  'rgba(255,255,255,0.12)',
-    text1:    '#f0f4ff',
-    text2:    '#7a8ca8',
-    text3:    '#3a4d62',
-    green:    '#22c55e',
-    greenDim: 'rgba(34,197,94,0.15)',
-    greenBrd: 'rgba(34,197,94,0.35)',
-    red:      '#ef4444',
-    redDim:   'rgba(239,68,68,0.12)',
-    amber:    '#f59e0b',
-    amberDim: 'rgba(245,158,11,0.15)',
-    amberBrd: 'rgba(245,158,11,0.4)',
-    purple:   '#8b5cf6',
+    bg:       '#080808',
+    surface:  '#101010',
+    surface2: '#181818',
+    border:   'rgba(212,160,23,0.1)',
+    border2:  'rgba(212,160,23,0.22)',
+    text1:    '#f5f0e8',
+    text2:    '#857a68',
+    text3:    '#3d3528',
+    // Gold — primary accent
+    gold:     '#c9a227',
+    goldBrt:  '#f0c040',
+    goldDim:  'rgba(201,162,39,0.13)',
+    goldBrd:  'rgba(201,162,39,0.38)',
+    // Aliases so all existing C.green / C.amber refs map to gold
+    green:    '#c9a227',
+    greenDim: 'rgba(201,162,39,0.13)',
+    greenBrd: 'rgba(201,162,39,0.38)',
+    amber:    '#c9a227',
+    amberDim: 'rgba(201,162,39,0.13)',
+    amberBrd: 'rgba(201,162,39,0.38)',
+    // Red — opponent accent
+    red:      '#c44',
+    redDim:   'rgba(204,68,68,0.1)',
+    redBrd:   'rgba(204,68,68,0.28)',
+    purple:   '#9b7fe8',
   };
 
   const sideMinW  = Math.round(90 * scale);
@@ -1426,7 +1434,7 @@ export default function Sueca() {
         border: `1px solid ${active ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.07)'}`,
         fontSize: `clamp(10px, 2vw, 13px)`,
         fontWeight: 500,
-        color: active ? '#86efac' : C.text2,
+        color: active ? C.goldBrt : C.text2,
         letterSpacing: '0.3px',
         transition: 'all 0.2s',
         fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
@@ -1441,7 +1449,7 @@ export default function Sueca() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: `radial-gradient(ellipse at 50% 35%, #0e1e36 0%, ${C.bg} 70%)`,
+      background: `radial-gradient(ellipse at 50% 30%, #1a1408 0%, ${C.bg} 65%)`,
       fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
       color: C.text1,
       display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden',
@@ -1474,7 +1482,7 @@ export default function Sueca() {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
           {[
             { label: tr.US,   pts: state.roundPts[myTeam],   wins: state.gamePts[myTeam],   sets: state.setPts[myTeam],   accent: C.green,  dimBg: C.greenDim,  brd: C.greenBrd  },
-            { label: tr.THEM, pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], sets: state.setPts[1-myTeam], accent: C.red,    dimBg: C.redDim,    brd: 'rgba(239,68,68,0.3)' },
+            { label: tr.THEM, pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], sets: state.setPts[1-myTeam], accent: C.red,    dimBg: C.redDim,    brd: C.redBrd },
           ].map(({ label, pts, wins, sets, accent, dimBg, brd }, i) => (
             <div key={i} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -1598,7 +1606,7 @@ export default function Sueca() {
           border: `1px solid ${isYourTurn ? C.greenBrd : C.border}`,
           boxShadow: isYourTurn ? `0 0 20px rgba(34,197,94,0.12)` : 'none',
           fontSize: msgFs, fontWeight: 500,
-          color: isYourTurn ? '#86efac' : C.text2,
+          color: isYourTurn ? C.goldBrt : C.text2,
           textAlign: 'center', transition: 'all 0.25s',
           letterSpacing: '0.01em',
         }}>
@@ -1629,7 +1637,7 @@ export default function Sueca() {
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '5px 12px', borderRadius: 20,
               background: 'rgba(34,197,94,0.1)', border: `1px solid ${C.greenBrd}`,
-              fontSize: labelFs, fontWeight: 600, color: '#86efac',
+              fontSize: labelFs, fontWeight: 600, color: C.goldBrt,
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
               {getName(perspective)}
