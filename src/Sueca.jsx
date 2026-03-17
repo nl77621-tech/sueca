@@ -1374,13 +1374,6 @@ export default function Sueca() {
     state.tricksLeft === 10 &&
     state.hands[state.dealer] &&
     state.hands[state.dealer].some(c => c.id === state.trumpCard.id);
-  const dealerSlot = (state.dealer - perspective + 4) % 4; // 0=bottom,1=left,2=top,3=right
-  const trumpPos = [
-    { bottom: '27%', left: '48%', transform: 'translateX(-50%) rotate(-12deg)' },
-    { left: '26%',  top: '46%',  transform: 'translateY(-50%) rotate(10deg)' },
-    { top: '13%',   left: '48%', transform: 'translateX(-50%) rotate(12deg)' },
-    { left: '63%',  top: '46%',  transform: 'translateY(-50%) rotate(-10deg)' },
-  ][dealerSlot] || {};
 
   // Scaled sizes for layout spacing
   const sideMinW = Math.round(90 * scale);
@@ -1525,18 +1518,6 @@ export default function Sueca() {
         gap: Math.round(8 * scale),
       }}>
 
-        {/* Floating trump card near dealer */}
-        {trumpCardHeld && (
-          <div style={{ position: 'absolute', zIndex: 20, pointerEvents: 'none', ...trumpPos }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-              <div style={{ fontSize: Math.max(7, Math.round(9 * scale)), color: '#fcd34d', letterSpacing: 1, textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                {tr.trumpLabel}
-              </div>
-              <Card card={state.trumpCard} small scale={scale} />
-            </div>
-          </div>
-        )}
-
         {/* Top player (partner) */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale) }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(6 * scale) }}>
@@ -1556,7 +1537,18 @@ export default function Sueca() {
           </div>
 
           {/* Center trick area */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(12 * scale) }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(8 * scale) }}>
+            {/* Trump card — shown in centre until first trick is complete */}
+            {trumpCardHeld && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, pointerEvents: 'none' }}>
+                <div style={{ fontSize: Math.max(7, Math.round(9 * scale)), color: '#fcd34d', letterSpacing: 1, textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+                  {tr.trumpLabel}
+                </div>
+                <div style={{ transform: 'rotate(-8deg)', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.6))' }}>
+                  <Card card={state.trumpCard} small scale={scale} />
+                </div>
+              </div>
+            )}
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: Math.round(16 * scale), border: '1px solid rgba(255,255,255,0.06)', padding: trickPad }}>
               <TrickArea
                 trick={state.trick}
