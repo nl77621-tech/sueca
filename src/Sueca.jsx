@@ -1386,157 +1386,167 @@ export default function Sueca() {
     state.hands[state.dealer] &&
     state.hands[state.dealer].some(c => c.id === state.trumpCard.id);
 
-  // Scaled sizes for layout spacing
-  const sideMinW = Math.round(90 * scale);
-  const trickPad = Math.round(12 * scale);
-  const middleGap = Math.round(20 * scale);
-  const labelFs = Math.max(9, Math.round(11 * scale));
-  const msgFs = Math.max(11, Math.round(14 * scale));
+  // ── Design tokens ──
+  const C = {
+    bg:       '#07101f',
+    surface:  '#0d1829',
+    surface2: '#111e30',
+    border:   'rgba(255,255,255,0.07)',
+    border2:  'rgba(255,255,255,0.12)',
+    text1:    '#f0f4ff',
+    text2:    '#7a8ca8',
+    text3:    '#3a4d62',
+    green:    '#22c55e',
+    greenDim: 'rgba(34,197,94,0.15)',
+    greenBrd: 'rgba(34,197,94,0.35)',
+    red:      '#ef4444',
+    redDim:   'rgba(239,68,68,0.12)',
+    amber:    '#f59e0b',
+    amberDim: 'rgba(245,158,11,0.15)',
+    amberBrd: 'rgba(245,158,11,0.4)',
+    purple:   '#8b5cf6',
+  };
 
-  // Italic serif player label — rendered directly on the felt
+  const sideMinW  = Math.round(90 * scale);
+  const middleGap = Math.round(20 * scale);
+  const labelFs   = Math.max(9, Math.round(11 * scale));
+  const msgFs     = Math.max(11, Math.round(14 * scale));
+  const dealerName = state.dealer === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.dealer);
+
+  // Clean minimal player chip
   const playerLabel = (pos) => {
     const active = isPlaying(pos);
+    const human  = isHumanPlayer(pos);
     return (
       <div style={{
-        fontFamily: 'Georgia, serif', fontStyle: 'italic',
-        fontSize: `clamp(13px, 2.8vw, 19px)`,
-        color: active ? '#fde68a' : '#c8a86b',
-        textShadow: '0 2px 8px rgba(0,0,0,0.85)',
-        whiteSpace: 'nowrap', letterSpacing: '0.3px',
-        display: 'flex', alignItems: 'center', gap: 5,
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '4px 10px',
+        borderRadius: 20,
+        background: active ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${active ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.07)'}`,
+        fontSize: `clamp(10px, 2vw, 13px)`,
+        fontWeight: 500,
+        color: active ? '#86efac' : C.text2,
+        letterSpacing: '0.3px',
+        transition: 'all 0.2s',
+        fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
       }}>
-        {isHumanPlayer(pos) ? '' : <span style={{ fontSize: '0.75em', opacity: 0.7 }}>🤖</span>}
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: active ? C.green : C.text3, flexShrink: 0, boxShadow: active ? `0 0 6px ${C.green}` : 'none', transition: 'all 0.2s' }} />
+        {!human && <span style={{ fontSize: '0.85em', opacity: 0.6 }}>🤖</span>}
         {getName(pos)}{active ? ' …' : ''}
       </div>
     );
   };
 
-  // Info for overlays
-  const dealerName = state.dealer === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.dealer);
-
-  // Golden SVG corner ornament
-  const Corner = ({ top, left, right, bottom, rot }) => (
-    <div style={{ position: 'fixed', top, left, right, bottom, zIndex: 4, pointerEvents: 'none' }}>
-      <svg width="88" height="88" viewBox="0 0 88 88" style={{ display: 'block', transform: `rotate(${rot}deg)` }}>
-        <path d="M2 86 L2 18 Q2 2 18 2 L86 2" fill="none" stroke="#7a5c10" strokeWidth="3.5"/>
-        <path d="M6 86 L6 22 Q6 6 22 6 L86 6" fill="none" stroke="#c9a227" strokeWidth="1" opacity="0.55"/>
-        <circle cx="14" cy="14" r="10" fill="#5c3d08" stroke="#c9a227" strokeWidth="1.5"/>
-        <circle cx="14" cy="14" r="5"  fill="#c9a227" opacity="0.9"/>
-        <circle cx="14" cy="14" r="2"  fill="#5c3d08"/>
-        <circle cx="34" cy="8"  r="2.5" fill="#7a5c10"/>
-        <circle cx="8"  cy="34" r="2.5" fill="#7a5c10"/>
-        <circle cx="48" cy="6"  r="1.5" fill="#c9a227" opacity="0.5"/>
-        <circle cx="6"  cy="48" r="1.5" fill="#c9a227" opacity="0.5"/>
-      </svg>
-    </div>
-  );
-
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'radial-gradient(ellipse at 50% 45%, #1f5c28 0%, #164a1e 45%, #0c2e10 100%)',
-      fontFamily: 'Georgia, serif', color: 'white',
+      background: `radial-gradient(ellipse at 50% 35%, #0e1e36 0%, ${C.bg} 70%)`,
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+      color: C.text1,
       display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden',
     }}>
-      {/* Felt texture */}
+      {/* Subtle noise/grain layer */}
       <div style={{
-        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 3 L3 0 L6 3 L3 6 Z' fill='none' stroke='rgba(0,0,0,0.07)' stroke-width='0.5'/%3E%3C/svg%3E")`,
+        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, opacity: 0.025,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
       }} />
 
-      {/* Golden corner ornaments */}
-      <Corner top={0} left={0}   rot={0}   />
-      <Corner top={0} right={0}  rot={90}  />
-      <Corner bottom={0} left={0}  rot={-90} />
-      <Corner bottom={0} right={0} rot={180} />
+      {/* ── Top HUD bar ── */}
+      <div style={{
+        position: 'relative', zIndex: 10,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px',
+        height: 52,
+        background: 'rgba(7,16,31,0.8)',
+        borderBottom: `1px solid ${C.border}`,
+        backdropFilter: 'blur(12px)',
+        flexWrap: 'nowrap', gap: 8,
+      }}>
 
-      {/* ── SUECA logo — top left ── */}
-      <div style={{ position: 'fixed', top: 14, left: 100, zIndex: 10, pointerEvents: 'none' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <div style={{ fontSize: 'clamp(9px,1.8vw,12px)', color: '#c9a227', letterSpacing: 4, fontStyle: 'italic', opacity: 0.8 }}>✦ ✦ ✦</div>
-          <div style={{
-            fontSize: 'clamp(18px, 4vw, 28px)', fontWeight: 'bold', letterSpacing: 'clamp(3px, 1vw, 7px)',
-            background: 'linear-gradient(180deg, #fde68a 0%, #c9a227 50%, #f59e0b 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            textShadow: 'none', fontStyle: 'italic',
-          }}>SUECA</div>
-          <div style={{ fontSize: 'clamp(9px,1.8vw,12px)', color: '#c9a227', letterSpacing: 4, fontStyle: 'italic', opacity: 0.8 }}>✦ ✦ ✦</div>
+        {/* Logo */}
+        <div style={{
+          fontSize: 'clamp(13px,3vw,17px)', fontWeight: 700, letterSpacing: '0.12em',
+          color: C.text1, flexShrink: 0,
+        }}>SUECA</div>
+
+        {/* Score chips — centred */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          {[
+            { label: tr.US,   pts: state.roundPts[myTeam],   wins: state.gamePts[myTeam],   sets: state.setPts[myTeam],   accent: C.green,  dimBg: C.greenDim,  brd: C.greenBrd  },
+            { label: tr.THEM, pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], sets: state.setPts[1-myTeam], accent: C.red,    dimBg: C.redDim,    brd: 'rgba(239,68,68,0.3)' },
+          ].map(({ label, pts, wins, sets, accent, dimBg, brd }, i) => (
+            <div key={i} style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              padding: '4px 14px',
+              borderRadius: 10, background: dimBg,
+              border: `1px solid ${brd}`,
+              minWidth: 'clamp(56px,10vw,76px)',
+            }}>
+              <div style={{ fontSize: 'clamp(7px,1.2vw,9px)', color: accent, letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
+              <div style={{ fontSize: 'clamp(18px,4vw,24px)', fontWeight: 700, color: C.text1, lineHeight: 1.1 }}>{pts}</div>
+              <div style={{ display: 'flex', gap: 3, marginTop: 2 }}>
+                {[0,1,2,3].map(j => (
+                  <div key={j} style={{ width: 5, height: 5, borderRadius: '50%', background: j < wins ? accent : C.text3, transition: 'background 0.3s' }} />
+                ))}
+              </div>
+              {sets > 0 && <div style={{ fontSize: 8, color: C.purple, marginTop: 1, letterSpacing: '0.1em' }}>{tr.setPtsLabel} {sets}</div>}
+            </div>
+          ))}
+        </div>
+
+        {/* Right cluster — trump, dealer, tricks, room */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {state.trump !== null && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px', borderRadius: 8,
+              background: C.amberDim, border: `1px solid ${C.amberBrd}`,
+            }}>
+              <span style={{ fontSize: 'clamp(7px,1.3vw,9px)', color: C.amber, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{tr.TRUMP}</span>
+              <span style={{ fontSize: 'clamp(15px,3vw,20px)', color: RED[state.trump] ? C.red : C.text1, fontWeight: 700, lineHeight: 1 }}>{S[state.trump]}</span>
+            </div>
+          )}
+          {state.phase !== 'welcome' && (() => {
+            const isMyTurn = state.phase === 'playing' && state.current === perspective;
+            const nextName = state.phase === 'playing'
+              ? (state.current === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.current))
+              : null;
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ fontSize: 'clamp(7px,1.2vw,9px)', color: C.text3, letterSpacing: '0.1em' }}>
+                  {tr.DEALER} <span style={{ color: C.amber, fontWeight: 600 }}>{dealerName}</span>
+                </div>
+                {nextName && (
+                  <div style={{ fontSize: 'clamp(7px,1.2vw,9px)', color: C.text3, letterSpacing: '0.1em' }}>
+                    {tr.NEXT} <span style={{ color: isMyTurn ? C.green : C.text2, fontWeight: 600 }}>{nextName}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          <div style={{ fontSize: 'clamp(8px,1.3vw,10px)', color: C.text3, paddingLeft: 6, borderLeft: `1px solid ${C.border}`, lineHeight: 1.5 }}>
+            {state.tricksLeft}<br /><span style={{ fontSize: '0.85em' }}>{tr.tricks}</span>
+          </div>
+          {multiMode && (
+            <div style={{ fontSize: 'clamp(8px,1.3vw,10px)', color: C.text3, paddingLeft: 6, borderLeft: `1px solid ${C.border}` }}>
+              {tr.room}<br /><span style={{ color: C.amber, fontWeight: 700, letterSpacing: '0.15em' }}>{roomId}</span>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* ── Portrait score panels — top centre ── */}
-      <div style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: 10 }}>
-        {[
-          { label: tr.US,   pts: state.roundPts[myTeam],     wins: state.gamePts[myTeam],     sets: state.setPts[myTeam]     },
-          { label: tr.THEM, pts: state.roundPts[1-myTeam],   wins: state.gamePts[1-myTeam],   sets: state.setPts[1-myTeam]   },
-        ].map(({ label, pts, wins, sets }, i) => (
-          <div key={i} style={{
-            background: 'linear-gradient(180deg, #2e1c08 0%, #1a0f04 100%)',
-            border: '2px solid #7a5c10',
-            borderRadius: 8,
-            padding: '5px 14px 7px',
-            textAlign: 'center',
-            boxShadow: '0 4px 18px rgba(0,0,0,0.7), inset 0 1px 0 rgba(201,162,39,0.25)',
-            minWidth: 68,
-          }}>
-            <div style={{ fontSize: 'clamp(7px,1.4vw,9px)', color: '#c9a227', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 1 }}>{label}</div>
-            <div style={{ fontSize: 'clamp(22px,5vw,32px)', fontWeight: 'bold', color: '#f5deb3', lineHeight: 1, fontFamily: 'Georgia, serif' }}>{pts}</div>
-            <div style={{ fontSize: 'clamp(8px,1.6vw,10px)', color: '#8B6B14', marginTop: 2, letterSpacing: 1 }}>
-              {'★'.repeat(wins)}{'☆'.repeat(Math.max(0, 4 - wins))}
-            </div>
-            {sets > 0 && <div style={{ fontSize: 8, color: '#a78bfa', marginTop: 1, letterSpacing: 1 }}>{tr.setPtsLabel} {sets}</div>}
-          </div>
-        ))}
-      </div>
-
-      {/* ── Wooden trump + dealer plaque — top right ── */}
-      {state.trump !== null && (() => {
-        const isMyTurn = state.phase === 'playing' && state.current === perspective;
-        const nextName = state.phase === 'playing'
-          ? (state.current === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.current))
-          : null;
-        return (
-          <div style={{
-            position: 'fixed', top: 8, right: 96, zIndex: 10,
-            background: 'linear-gradient(135deg, #5c3317 0%, #3d1f0a 60%, #4a2810 100%)',
-            border: '2px solid #7a5c10',
-            borderRadius: 10,
-            padding: '8px 12px 8px 8px',
-            display: 'flex', alignItems: 'center', gap: 10,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.75), inset 0 1px 0 rgba(201,162,39,0.18)',
-          }}>
-            {state.trumpCard && <Card card={state.trumpCard} small scale={Math.min(scale, 0.9)} />}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ fontSize: 'clamp(8px,1.6vw,10px)', color: '#c9a227', letterSpacing: 1 }}>
-                {tr.DEALER}: <span style={{ color: '#f5deb3', fontWeight: 'bold' }}>{dealerName}</span>
-              </div>
-              <div style={{ fontSize: 'clamp(8px,1.6vw,10px)', color: '#c9a227', letterSpacing: 1 }}>
-                {tr.TRUMP}: <span style={{ color: RED[state.trump] ? '#f87171' : '#f5deb3', fontWeight: 'bold', fontSize: '1.2em' }}>{S[state.trump]}</span>
-              </div>
-              {nextName && (
-                <div style={{ fontSize: 'clamp(7px,1.4vw,9px)', color: isMyTurn ? '#86efac' : '#94a3b8', letterSpacing: 1, marginTop: 1 }}>
-                  {tr.NEXT}: <span style={{ fontWeight: 'bold' }}>{nextName}</span>
-                </div>
-              )}
-              {multiMode && roomId && (
-                <div style={{ fontSize: 8, color: '#7a5c10', letterSpacing: 2, marginTop: 1 }}>{roomId}</div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ── Table ── */}
       <div style={{
         flex: 1, position: 'relative', zIndex: 5,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'space-between',
-        padding: `${Math.round(20 * scale)}px ${Math.round(14 * scale)}px ${Math.round(12 * scale)}px`,
+        padding: `${Math.round(16 * scale)}px ${Math.round(12 * scale)}px ${Math.round(10 * scale)}px`,
         gap: Math.round(6 * scale),
       }}>
 
-        {/* Top player (partner) */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(4 * scale), marginTop: Math.round(40 * scale) }}>
+        {/* North player */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(5 * scale) }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(6 * scale) }}>
             {multiMode && <VideoTile stream={rtc.remoteStreams[topPos]} scale={scale} />}
             {playerLabel(topPos)}
@@ -1553,8 +1563,14 @@ export default function Sueca() {
             <SideHand count={state.hands[leftPos].length} side="left" scale={scale} />
           </div>
 
-          {/* Center trick area — no box, just cards on the felt */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {/* Centre trick area */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(255,255,255,0.02)',
+            borderRadius: Math.round(20 * scale),
+            border: `1px solid ${C.border}`,
+            padding: Math.round(8 * scale),
+          }}>
             <TrickArea
               trick={state.trick}
               trickWinner={state.phase === 'resolving' ? state.trickWinner : null}
@@ -1573,21 +1589,20 @@ export default function Sueca() {
           </div>
         </div>
 
-        {/* Message bar — golden pill */}
+        {/* Message bar */}
         <div style={{
-          padding: `${Math.round(7 * scale)}px ${Math.round(28 * scale)}px`,
+          padding: `${Math.round(8 * scale)}px ${Math.round(24 * scale)}px`,
           borderRadius: 30,
           maxWidth: Math.round(460 * scale), width: '100%',
-          background: isYourTurn
-            ? 'linear-gradient(135deg, rgba(201,162,39,0.3) 0%, rgba(120,90,10,0.4) 100%)'
-            : 'rgba(0,0,0,0.35)',
-          border: `1px solid ${isYourTurn ? 'rgba(201,162,39,0.7)' : 'rgba(255,255,255,0.07)'}`,
-          boxShadow: isYourTurn ? '0 2px 16px rgba(201,162,39,0.25)' : 'none',
-          fontSize: msgFs, color: isYourTurn ? '#fde68a' : '#a08050',
-          textAlign: 'center', transition: 'all 0.3s',
-          fontStyle: 'italic', letterSpacing: '0.3px',
+          background: isYourTurn ? C.greenDim : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${isYourTurn ? C.greenBrd : C.border}`,
+          boxShadow: isYourTurn ? `0 0 20px rgba(34,197,94,0.12)` : 'none',
+          fontSize: msgFs, fontWeight: 500,
+          color: isYourTurn ? '#86efac' : C.text2,
+          textAlign: 'center', transition: 'all 0.25s',
+          letterSpacing: '0.01em',
         }}>
-          {isYourTurn ? `✦ ${lang === 'pt' ? 'Sua vez!' : 'Your turn!'}` : state.msg}
+          {isYourTurn ? (lang === 'pt' ? '✦ Sua vez!' : '✦ Your turn!') : state.msg}
           {isYourTurn && sel && (lang === 'pt' ? ' · Clique novamente para jogar!' : ' · Click again to play!')}
         </div>
 
@@ -1605,39 +1620,35 @@ export default function Sueca() {
               onReorder={(from, to) => dispatch({ type: 'REORDER_HAND', from, to, pi: perspective })}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(10 * scale), flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * scale), flexWrap: 'wrap', justifyContent: 'center' }}>
             {multiMode && rtc.localStream && (
               <VideoTile stream={rtc.localStream} muted mirror scale={scale} />
             )}
-            {/* Player name — italic serif on felt */}
+            {/* You label */}
             <div style={{
-              fontFamily: 'Georgia, serif', fontStyle: 'italic',
-              fontSize: `clamp(14px, 3vw, 20px)`,
-              color: '#c8a86b',
-              textShadow: '0 2px 8px rgba(0,0,0,0.85)',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '5px 12px', borderRadius: 20,
+              background: 'rgba(34,197,94,0.1)', border: `1px solid ${C.greenBrd}`,
+              fontSize: labelFs, fontWeight: 600, color: '#86efac',
             }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
               {getName(perspective)}
             </div>
-            {/* Auto Ordenar — wooden button */}
+            {/* Auto sort */}
             <button
               onClick={() => dispatch({ type: 'AUTO_ORDER_HAND', pi: perspective })}
               style={{
-                padding: `${Math.round(5 * scale)}px ${Math.round(16 * scale)}px`,
-                borderRadius: 24, fontSize: labelFs, fontWeight: 'bold',
-                background: 'linear-gradient(135deg, #6b3f1a 0%, #4a2810 60%, #5c3317 100%)',
-                border: '2px solid #7a5c10',
-                color: '#fde68a', cursor: 'pointer',
-                fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '0.5px',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(201,162,39,0.2)',
-                display: 'flex', alignItems: 'center', gap: Math.round(5 * scale),
+                padding: `5px ${Math.round(14 * scale)}px`,
+                borderRadius: 20, fontSize: labelFs, fontWeight: 500,
+                background: 'rgba(255,255,255,0.05)',
+                border: `1px solid ${C.border2}`,
+                color: C.text2, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+                transition: 'all 0.15s',
               }}
             >
-              ✦ {lang === 'pt' ? 'Auto Ordenar' : 'Auto Sort'}
+              ⇅ {lang === 'pt' ? 'Ordenar' : 'Sort'}
             </button>
-            {/* Tricks left */}
-            <div style={{ fontSize: 'clamp(9px,1.8vw,11px)', color: '#7a5c10', textAlign: 'center', fontStyle: 'italic' }}>
-              {state.tricksLeft} {tr.tricks}
-            </div>
           </div>
         </div>
       </div>
@@ -1697,8 +1708,9 @@ export default function Sueca() {
       )}
 
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         @keyframes cardSlide {
-          from { opacity: 0; transform: scale(0.7) translateY(-10px); }
+          from { opacity: 0; transform: scale(0.8) translateY(-8px); }
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
         @keyframes pulse {
@@ -1710,8 +1722,9 @@ export default function Sueca() {
           0%   { transform: rotate(-12deg) scale(1.05); }
           100% { transform: rotate(12deg)  scale(1.15); }
         }
-        button:active { transform: scale(0.97) !important; }
-        input::placeholder { color: #475569; }
+        button:hover { opacity: 0.85; }
+        button:active { transform: scale(0.96) !important; }
+        input::placeholder { color: #3a4d62; }
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
       `}</style>
     </div>
