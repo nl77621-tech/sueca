@@ -98,8 +98,10 @@ export const INIT = {
   trump: null, trumpCard: null,
   trick: [], trickWinner: null,
   current: 0, leader: 0, dealer: 0,
-  roundPts: [0, 0], gamePts: [0, 0],
+  roundPts: [0, 0], gamePts: [0, 0], setPts: [0, 0],
   tricksLeft: 10, msg: '', sel: null,
+  bandeira: null,  // null | 0 | 1  — which team got all the cards
+  setWon: null,    // null | 0 | 1  — which team just won the set
 };
 
 export const reduce = (state, action) => {
@@ -118,6 +120,8 @@ export const reduce = (state, action) => {
       return {
         ...state, phase: 'playing', hands, trump, trumpCard, current, leader, dealer,
         trick: [], trickWinner: null, roundPts: [0, 0], tricksLeft: 10, sel: null,
+        gamePts: state.setWon !== null ? [0, 0] : state.gamePts, // reset after set win
+        bandeira: null, setWon: null,
         msg: `Nova rodada! Trunfo: ${S[trump]}`,
       };
     }
@@ -144,11 +148,22 @@ export const reduce = (state, action) => {
       const rp = [...state.roundPts]; rp[TEAM[w]] += tp;
       const tl = state.tricksLeft - 1;
       if (tl === 0) {
-        const gp = [...state.gamePts]; gp[rp[0] >= 61 ? 0 : 1]++;
+        const winner = rp[0] >= 61 ? 0 : 1;
+        const loser  = 1 - winner;
+        const isBandeira = rp[loser] === 0;          // all 120 points — Bandeira!
+        const earnedGP   = rp[loser] < 30 ? 2 : 1;  // double if opponent < 30 pts
+        const gp = [...state.gamePts];
+        gp[winner] += earnedGP;
+        const sp = [...state.setPts];
+        const wonSet = gp[winner] >= 4;
+        if (wonSet) sp[winner]++;                    // set won — increment set counter
         return {
           ...state, hands: newH, trick: newT, trickWinner: w,
-          roundPts: rp, gamePts: gp, tricksLeft: 0, sel: null, phase: 'round_end',
-          msg: `Rodada terminada! A: ${rp[0]} pts | B: ${rp[1]} pts`,
+          roundPts: rp, gamePts: gp, setPts: sp,
+          tricksLeft: 0, sel: null, phase: 'round_end',
+          bandeira: isBandeira ? winner : null,
+          setWon: wonSet ? winner : null,
+          msg: `Rodada terminada!${isBandeira ? ' BANDEIRA!' : ''} A: ${rp[0]} pts | B: ${rp[1]} pts`,
         };
       }
       return {

@@ -50,6 +50,10 @@ const T = {
     teamLost: 'Os adversários ganharam esta rodada',
     gamesWon: 'Partidas ganhas', us: 'Nós', them: 'Eles',
     newRound: 'Nova Rodada', newGame: 'Novo Jogo',
+    bandeiraTitle: '🚩 BANDEIRA!', bandeiraDesc: 'Todas as cartas capturadas!',
+    setWonTitle: '🏆 Set Ganho!', setWonDesc: 'O jogo recomeça — sets:',
+    doublePoints: '× 2 pontos!', setsLabel: 'Sets', gamesLabel: 'jogos',
+    gamesTo4: 'até 4', setPtsLabel: 'SETS',
     US: 'NÓS', THEM: 'ELES', TRUMP: 'TRUNFO', DEALER: 'DADOR', NEXT: 'VEZ',
     tricks: 'vazas', room: 'Sala', you: 'Você', trumpLabel: 'trunfo',
     rejoiningMsg: 'A rejoin a sala…', reconnecting: 'A reconnectar ao jogo', cancel: 'Cancelar',
@@ -81,6 +85,10 @@ const T = {
     teamLost: 'The opponents won this round',
     gamesWon: 'Games won', us: 'Us', them: 'Them',
     newRound: 'New Round', newGame: 'New Game',
+    bandeiraTitle: '🚩 BANDEIRA!', bandeiraDesc: 'All cards captured!',
+    setWonTitle: '🏆 Set Won!', setWonDesc: 'Game resets — sets:',
+    doublePoints: '× 2 points!', setsLabel: 'Sets', gamesLabel: 'games',
+    gamesTo4: 'to 4', setPtsLabel: 'SETS',
     US: 'US', THEM: 'THEM', TRUMP: 'TRUMP', DEALER: 'DEALER', NEXT: 'NEXT',
     tricks: 'tricks', room: 'Room', you: 'You', trumpLabel: 'trump',
     rejoiningMsg: 'Rejoining room…', reconnecting: 'Reconnecting to game', cancel: 'Cancel',
@@ -969,7 +977,7 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError, lang, 
 // ═══════════════════════════════════════════
 // ROUND END OVERLAY
 // ═══════════════════════════════════════════
-const RoundEnd = ({ roundPts, gamePts, perspective, players, onNewRound, onNewGame, lang }) => {
+const RoundEnd = ({ roundPts, gamePts, setPts, bandeira, setWon, perspective, players, onNewRound, onNewGame, lang }) => {
   const tr = T[lang];
   const myTeam = TEAM[perspective];
   const myPts = roundPts[myTeam], theirPts = roundPts[1 - myTeam];
@@ -979,57 +987,126 @@ const RoundEnd = ({ roundPts, gamePts, perspective, players, onNewRound, onNewGa
   const myLabel = `${getName(perspective)} + ${getName(partnerPos)}`;
   const theirLabel = `${getName((perspective+1)%4)} + ${getName((perspective+3)%4)}`;
 
+  // Compute whether double points were awarded this round
+  const roundWinner = roundPts[0] >= 61 ? 0 : 1;
+  const roundLoser  = 1 - roundWinner;
+  const earnedGP    = roundPts[roundLoser] < 30 ? 2 : 1;
+  const isBandeira  = bandeira !== null && bandeira !== undefined;
+  const isSetWon    = setWon !== null && setWon !== undefined;
+  const safeSets    = setPts || [0, 0];
+
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 200, backdropFilter: 'blur(4px)', padding: 16,
+      zIndex: 200, backdropFilter: 'blur(4px)', padding: 16, overflowY: 'auto',
     }}>
       <div style={{
         background: 'linear-gradient(145deg, #1e293b, #0f172a)',
-        borderRadius: 24, padding: 'clamp(20px, 5vw, 40px) clamp(20px, 6vw, 48px)',
+        borderRadius: 24, padding: 'clamp(16px, 4vw, 32px) clamp(16px, 5vw, 40px)',
         textAlign: 'center',
-        border: `2px solid ${iWin ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
+        border: `2px solid ${isBandeira ? 'rgba(251,191,36,0.6)' : isSetWon ? 'rgba(147,51,234,0.5)' : iWin ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
         boxShadow: `0 24px 80px rgba(0,0,0,0.6)`,
-        width: '100%', maxWidth: 400, fontFamily: 'Georgia, serif', color: 'white',
+        width: '100%', maxWidth: 420, fontFamily: 'Georgia, serif', color: 'white',
       }}>
-        <div style={{ fontSize: 'clamp(40px, 10vw, 64px)', marginBottom: 8 }}>{iWin ? '🎉' : '😔'}</div>
-        <h2 style={{ fontSize: 'clamp(22px, 6vw, 32px)', margin: '0 0 4px', color: iWin ? '#86efac' : '#fca5a5' }}>
+
+        {/* ── Bandeira banner ── */}
+        {isBandeira && (
+          <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(251,191,36,0.15)', borderRadius: 16, border: '2px solid rgba(251,191,36,0.5)' }}>
+            <div style={{ fontSize: 'clamp(36px, 9vw, 52px)', animation: 'flagWave 0.7s ease-in-out infinite alternate', display: 'inline-block', transformOrigin: 'bottom left' }}>🚩</div>
+            <div style={{ fontSize: 'clamp(16px, 4vw, 22px)', fontWeight: 'bold', color: '#fcd34d', marginTop: 4 }}>{tr.bandeiraTitle}</div>
+            <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 2 }}>{tr.bandeiraDesc}</div>
+          </div>
+        )}
+
+        {/* ── Set won banner ── */}
+        {isSetWon && (
+          <div style={{ marginBottom: 16, padding: '10px 16px', background: 'rgba(147,51,234,0.15)', borderRadius: 14, border: '2px solid rgba(147,51,234,0.5)' }}>
+            <div style={{ fontSize: 'clamp(28px, 7vw, 40px)' }}>🏆</div>
+            <div style={{ fontSize: 'clamp(14px, 3.5vw, 18px)', fontWeight: 'bold', color: '#c084fc', marginTop: 4 }}>{tr.setWonTitle}</div>
+            <div style={{ fontSize: 12, color: '#a78bfa', marginTop: 2 }}>
+              {tr.setWonDesc} {safeSets[myTeam]}–{safeSets[1 - myTeam]}
+            </div>
+          </div>
+        )}
+
+        {/* ── Win / loss header ── */}
+        <div style={{ fontSize: 'clamp(32px, 8vw, 52px)', marginBottom: 6 }}>{iWin ? '🎉' : '😔'}</div>
+        <h2 style={{ fontSize: 'clamp(20px, 5vw, 28px)', margin: '0 0 4px', color: iWin ? '#86efac' : '#fca5a5' }}>
           {iWin ? tr.victory : tr.defeat}
         </h2>
-        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
           {iWin ? tr.teamWon : tr.teamLost}
         </div>
-        <div style={{ marginBottom: 24 }}>
+
+        {/* ── Round points bars ── */}
+        <div style={{ marginBottom: 14 }}>
           {[
             { label: myLabel, pts: myPts, color: '#22c55e' },
             { label: theirLabel, pts: theirPts, color: '#ef4444' },
           ].map(({ label, pts, color }) => (
-            <div key={label} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>
+            <div key={label} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginBottom: 3 }}>
                 <span>{label}</span>
                 <span style={{ color, fontWeight: 'bold' }}>{pts} pts</span>
               </div>
-              <div style={{ height: 8, background: '#1e293b', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: 7, background: '#1e293b', borderRadius: 4, overflow: 'hidden' }}>
                 <div style={{ height: '100%', background: color, borderRadius: 4, width: `${(pts / 120) * 100}%`, transition: 'width 0.8s' }} />
               </div>
             </div>
           ))}
         </div>
-        <div style={{ padding: '12px 20px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, marginBottom: 24, fontSize: 13, color: '#94a3b8' }}>
-          {tr.gamesWon} —{' '}
-          <span style={{ color: '#86efac', fontWeight: 'bold' }}>{tr.us}: {gamePts[myTeam]}</span>
-          {' | '}
-          <span style={{ color: '#fca5a5', fontWeight: 'bold' }}>{tr.them}: {gamePts[1 - myTeam]}</span>
+
+        {/* ── Game points progress (toward 4) ── */}
+        <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 11, color: '#64748b' }}>{tr.gamesWon} ({tr.gamesTo4})</span>
+            {earnedGP === 2 && (
+              <span style={{ fontSize: 11, color: '#fbbf24', fontWeight: 'bold', background: 'rgba(251,191,36,0.15)', padding: '2px 8px', borderRadius: 10 }}>
+                {tr.doublePoints}
+              </span>
+            )}
+          </div>
+          {[
+            { label: tr.us,   gp: gamePts[myTeam],       color: '#22c55e' },
+            { label: tr.them, gp: gamePts[1 - myTeam],   color: '#ef4444' },
+          ].map(({ label, gp, color }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+              <span style={{ fontSize: 11, color: '#94a3b8', width: 26, textAlign: 'left', flexShrink: 0 }}>{label}</span>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {[0, 1, 2, 3].map(i => (
+                  <div key={i} style={{
+                    width: 14, height: 14, borderRadius: 3,
+                    background: i < gp ? color : 'rgba(255,255,255,0.07)',
+                    border: `1px solid ${i < gp ? color : 'rgba(255,255,255,0.1)'}`,
+                    transition: 'background 0.4s',
+                  }} />
+                ))}
+              </div>
+              <span style={{ fontSize: 11, color, fontWeight: 'bold' }}>{gp}/4</span>
+            </div>
+          ))}
         </div>
+
+        {/* ── Sets tally (only show once at least one set has been played) ── */}
+        {(safeSets[0] > 0 || safeSets[1] > 0) && (
+          <div style={{ padding: '7px 14px', background: 'rgba(147,51,234,0.1)', borderRadius: 10, marginBottom: 12, fontSize: 12, color: '#a78bfa', display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
+            <span style={{ letterSpacing: 1 }}>{tr.setPtsLabel}</span>
+            <span style={{ color: '#c084fc', fontWeight: 'bold' }}>{tr.us}: {safeSets[myTeam]}</span>
+            <span style={{ color: '#475569' }}>|</span>
+            <span style={{ color: '#c084fc', fontWeight: 'bold' }}>{tr.them}: {safeSets[1 - myTeam]}</span>
+          </div>
+        )}
+
+        {/* ── Action buttons ── */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button onClick={onNewRound} style={{
-            padding: '12px 32px', fontSize: 15, borderRadius: 30, border: 'none',
+            padding: '11px 28px', fontSize: 14, borderRadius: 30, border: 'none',
             background: 'linear-gradient(135deg, #f59e0b, #d97706)',
             color: 'white', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Georgia, serif',
           }}>{tr.newRound}</button>
           <button onClick={onNewGame} style={{
-            padding: '12px 32px', fontSize: 15, borderRadius: 30,
+            padding: '11px 28px', fontSize: 14, borderRadius: 30,
             border: '1px solid rgba(255,255,255,0.2)',
             background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontFamily: 'Georgia, serif',
           }}>{tr.newGame}</button>
@@ -1361,15 +1438,20 @@ export default function Sueca() {
         {/* Scores */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
           {[
-            { label: tr.US, pts: state.roundPts[myTeam], wins: state.gamePts[myTeam], color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
-            { label: tr.THEM, pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
-          ].map(({ label, pts, wins, color, bg }, i) => (
+            { label: tr.US, pts: state.roundPts[myTeam], wins: state.gamePts[myTeam], sets: state.setPts[myTeam], color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
+            { label: tr.THEM, pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], sets: state.setPts[1-myTeam], color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+          ].map(({ label, pts, wins, sets, color, bg }, i) => (
             <div key={i} style={{ padding: `4px ${Math.max(8, Math.round(14 * Math.min(1, window.innerWidth / 600)))}px`, borderRadius: 12, background: bg, border: `1px solid ${color}44`, textAlign: 'center', minWidth: Math.max(50, Math.round(70 * Math.min(1, window.innerWidth / 600))) }}>
               <div style={{ fontSize: hdrLabel, color, letterSpacing: 2, marginBottom: 2 }}>{label}</div>
               <div style={{ fontSize: hdrScore, fontWeight: 'bold', color, lineHeight: 1 }}>{pts}</div>
               <div style={{ fontSize: Math.max(7, Math.round(10 * Math.min(1, window.innerWidth / 600))), color: '#64748b', marginTop: 2 }}>
                 {'★'.repeat(wins)}{'☆'.repeat(Math.max(0, 4 - wins))}
               </div>
+              {sets > 0 && (
+                <div style={{ fontSize: Math.max(6, Math.round(8 * Math.min(1, window.innerWidth / 600))), color: '#a78bfa', marginTop: 1, letterSpacing: 1 }}>
+                  {tr.setPtsLabel} {sets}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1553,6 +1635,9 @@ export default function Sueca() {
         <RoundEnd
           roundPts={state.roundPts}
           gamePts={state.gamePts}
+          setPts={state.setPts}
+          bandeira={state.bandeira}
+          setWon={state.setWon}
           perspective={perspective}
           players={players}
           onNewRound={() => dispatch({ type: 'NEW_ROUND' })}
@@ -1608,6 +1693,10 @@ export default function Sueca() {
           0%   { transform: scale(0); opacity: 0; }
           60%  { transform: scale(1.4); opacity: 1; }
           100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes flagWave {
+          0%   { transform: rotate(-12deg) scale(1.05); }
+          100% { transform: rotate(12deg)  scale(1.15); }
         }
         button:active { transform: scale(0.97) !important; }
         input::placeholder { color: #475569; }
