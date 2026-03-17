@@ -5,10 +5,18 @@ import { S, RED, RNK, TEAM, PNAME, reduce, aiPick, validCards, INIT } from "./ga
 // RESPONSIVE SCALE HOOK
 // ═══════════════════════════════════════════
 const useGameScale = () => {
-  const calc = () => Math.min(1, Math.max(0.42, window.innerWidth / 800));
-  const [scale, setScale] = useState(calc);
+  const calc = () => {
+    const w = window.innerWidth;
+    const isMobile = w < 520;
+    // On mobile use a tighter divisor so cards fill more of the screen
+    const scale = isMobile
+      ? Math.min(0.72, Math.max(0.42, w / 600))
+      : Math.min(1, Math.max(0.72, w / 800));
+    return { scale, isMobile };
+  };
+  const [dims, setDims] = useState(calc);
   useEffect(() => {
-    const update = () => setScale(calc());
+    const update = () => setDims(calc());
     window.addEventListener('resize', update);
     window.addEventListener('orientationchange', update);
     return () => {
@@ -16,7 +24,7 @@ const useGameScale = () => {
       window.removeEventListener('orientationchange', update);
     };
   }, []);
-  return scale;
+  return dims;
 };
 
 // ═══════════════════════════════════════════
@@ -1171,7 +1179,7 @@ export default function Sueca() {
   };
 
   // ── Responsive scale ──
-  const scale = useGameScale();
+  const { scale, isMobile } = useGameScale();
 
   // ── Refs kept fresh for WebRTC hook ──
   const myPositionRef = useRef(myPosition);
@@ -1415,40 +1423,43 @@ export default function Sueca() {
     purple:   '#9b7fe8',
   };
 
-  const sideMinW  = Math.round(90 * scale);
-  const middleGap = Math.round(20 * scale);
+  const sideColW  = Math.round(84 * scale); // matches SideHand visual width (rotated card height)
+  const middleGap = isMobile ? Math.round(6 * scale) : Math.round(20 * scale);
   const labelFs   = Math.max(9, Math.round(11 * scale));
   const msgFs     = Math.max(11, Math.round(14 * scale));
   const dealerName = state.dealer === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.dealer);
 
-  // Clean minimal player chip
+  // Player chip — compact on mobile
   const playerLabel = (pos) => {
     const active = isPlaying(pos);
     const human  = isHumanPlayer(pos);
+    const name   = getName(pos);
     return (
       <div style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '4px 10px',
+        display: 'inline-flex', alignItems: 'center', gap: isMobile ? 4 : 6,
+        padding: isMobile ? '3px 7px' : '4px 10px',
         borderRadius: 20,
-        background: active ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${active ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.07)'}`,
-        fontSize: `clamp(10px, 2vw, 13px)`,
+        background: active ? C.goldDim : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${active ? C.goldBrd : C.border}`,
+        fontSize: isMobile ? 10 : `clamp(10px, 2vw, 13px)`,
         fontWeight: 500,
         color: active ? C.goldBrt : C.text2,
-        letterSpacing: '0.3px',
+        letterSpacing: '0.2px',
         transition: 'all 0.2s',
-        fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+        maxWidth: isMobile ? sideColW : undefined,
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
       }}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: active ? C.green : C.text3, flexShrink: 0, boxShadow: active ? `0 0 6px ${C.green}` : 'none', transition: 'all 0.2s' }} />
-        {!human && <span style={{ fontSize: '0.85em', opacity: 0.6 }}>🤖</span>}
-        {getName(pos)}{active ? ' …' : ''}
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: active ? C.gold : C.text3, flexShrink: 0, boxShadow: active ? `0 0 5px ${C.gold}` : 'none', transition: 'all 0.2s' }} />
+        {!human && <span style={{ fontSize: '0.8em', opacity: 0.6 }}>🤖</span>}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}{active ? ' …' : ''}</span>
       </div>
     );
   };
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: `radial-gradient(ellipse at 50% 30%, #1a1408 0%, ${C.bg} 65%)`,
       fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
       color: C.text1,
@@ -1464,81 +1475,83 @@ export default function Sueca() {
       <div style={{
         position: 'relative', zIndex: 10,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px',
-        height: 52,
-        background: 'rgba(7,16,31,0.8)',
+        padding: isMobile ? '0 10px' : '0 16px',
+        height: isMobile ? 44 : 52,
+        background: 'rgba(8,8,8,0.85)',
         borderBottom: `1px solid ${C.border}`,
         backdropFilter: 'blur(12px)',
-        flexWrap: 'nowrap', gap: 8,
+        gap: isMobile ? 6 : 8, flexShrink: 0,
       }}>
-
         {/* Logo */}
         <div style={{
-          fontSize: 'clamp(13px,3vw,17px)', fontWeight: 700, letterSpacing: '0.12em',
-          color: C.text1, flexShrink: 0,
+          fontSize: isMobile ? 13 : 'clamp(13px,3vw,17px)', fontWeight: 700,
+          letterSpacing: '0.12em', color: C.text1, flexShrink: 0,
         }}>SUECA</div>
 
-        {/* Score chips — centred */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+        {/* Score chips */}
+        <div style={{ display: 'flex', gap: isMobile ? 4 : 6, alignItems: 'center', flexShrink: 0 }}>
           {[
-            { label: tr.US,   pts: state.roundPts[myTeam],   wins: state.gamePts[myTeam],   sets: state.setPts[myTeam],   accent: C.green,  dimBg: C.greenDim,  brd: C.greenBrd  },
-            { label: tr.THEM, pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], sets: state.setPts[1-myTeam], accent: C.red,    dimBg: C.redDim,    brd: C.redBrd },
+            { label: tr.US,   pts: state.roundPts[myTeam],   wins: state.gamePts[myTeam],   sets: state.setPts[myTeam],   accent: C.gold,  dimBg: C.goldDim,  brd: C.goldBrd },
+            { label: tr.THEM, pts: state.roundPts[1-myTeam], wins: state.gamePts[1-myTeam], sets: state.setPts[1-myTeam], accent: C.red,   dimBg: C.redDim,   brd: C.redBrd  },
           ].map(({ label, pts, wins, sets, accent, dimBg, brd }, i) => (
             <div key={i} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
-              padding: '4px 14px',
-              borderRadius: 10, background: dimBg,
-              border: `1px solid ${brd}`,
-              minWidth: 'clamp(56px,10vw,76px)',
+              padding: isMobile ? '3px 10px' : '4px 14px',
+              borderRadius: 10, background: dimBg, border: `1px solid ${brd}`,
+              minWidth: isMobile ? 52 : 'clamp(56px,10vw,76px)',
             }}>
-              <div style={{ fontSize: 'clamp(7px,1.2vw,9px)', color: accent, letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
-              <div style={{ fontSize: 'clamp(18px,4vw,24px)', fontWeight: 700, color: C.text1, lineHeight: 1.1 }}>{pts}</div>
+              <div style={{ fontSize: isMobile ? 8 : 9, color: accent, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
+              <div style={{ fontSize: isMobile ? 18 : 'clamp(18px,4vw,24px)', fontWeight: 700, color: C.text1, lineHeight: 1.1 }}>{pts}</div>
               <div style={{ display: 'flex', gap: 3, marginTop: 2 }}>
                 {[0,1,2,3].map(j => (
-                  <div key={j} style={{ width: 5, height: 5, borderRadius: '50%', background: j < wins ? accent : C.text3, transition: 'background 0.3s' }} />
+                  <div key={j} style={{ width: isMobile ? 4 : 5, height: isMobile ? 4 : 5, borderRadius: '50%', background: j < wins ? accent : C.text3 }} />
                 ))}
               </div>
-              {sets > 0 && <div style={{ fontSize: 8, color: C.purple, marginTop: 1, letterSpacing: '0.1em' }}>{tr.setPtsLabel} {sets}</div>}
+              {sets > 0 && <div style={{ fontSize: 7, color: C.purple, marginTop: 1 }}>{tr.setPtsLabel} {sets}</div>}
             </div>
           ))}
         </div>
 
-        {/* Right cluster — trump, dealer, tricks, room */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        {/* Right cluster */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 8, flexShrink: 0 }}>
+          {/* Trump badge — always show */}
           {state.trump !== null && (
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '4px 10px', borderRadius: 8,
-              background: C.amberDim, border: `1px solid ${C.amberBrd}`,
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: isMobile ? '3px 7px' : '4px 10px', borderRadius: 8,
+              background: C.goldDim, border: `1px solid ${C.goldBrd}`,
             }}>
-              <span style={{ fontSize: 'clamp(7px,1.3vw,9px)', color: C.amber, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{tr.TRUMP}</span>
-              <span style={{ fontSize: 'clamp(15px,3vw,20px)', color: RED[state.trump] ? C.red : C.text1, fontWeight: 700, lineHeight: 1 }}>{S[state.trump]}</span>
+              <span style={{ fontSize: isMobile ? 8 : 9, color: C.gold, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{tr.TRUMP}</span>
+              <span style={{ fontSize: isMobile ? 14 : 20, color: RED[state.trump] ? C.red : C.text1, fontWeight: 700, lineHeight: 1 }}>{S[state.trump]}</span>
             </div>
           )}
-          {state.phase !== 'welcome' && (() => {
+          {/* Dealer / Next — hidden on mobile (shown in table overlay) */}
+          {!isMobile && state.phase !== 'welcome' && (() => {
             const isMyTurn = state.phase === 'playing' && state.current === perspective;
             const nextName = state.phase === 'playing'
               ? (state.current === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.current))
               : null;
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div style={{ fontSize: 'clamp(7px,1.2vw,9px)', color: C.text3, letterSpacing: '0.1em' }}>
-                  {tr.DEALER} <span style={{ color: C.amber, fontWeight: 600 }}>{dealerName}</span>
+                <div style={{ fontSize: 9, color: C.text3 }}>
+                  {tr.DEALER} <span style={{ color: C.gold, fontWeight: 600 }}>{dealerName}</span>
                 </div>
                 {nextName && (
-                  <div style={{ fontSize: 'clamp(7px,1.2vw,9px)', color: C.text3, letterSpacing: '0.1em' }}>
-                    {tr.NEXT} <span style={{ color: isMyTurn ? C.green : C.text2, fontWeight: 600 }}>{nextName}</span>
+                  <div style={{ fontSize: 9, color: C.text3 }}>
+                    {tr.NEXT} <span style={{ color: isMyTurn ? C.gold : C.text2, fontWeight: 600 }}>{nextName}</span>
                   </div>
                 )}
               </div>
             );
           })()}
-          <div style={{ fontSize: 'clamp(8px,1.3vw,10px)', color: C.text3, paddingLeft: 6, borderLeft: `1px solid ${C.border}`, lineHeight: 1.5 }}>
-            {state.tricksLeft}<br /><span style={{ fontSize: '0.85em' }}>{tr.tricks}</span>
-          </div>
+          {!isMobile && (
+            <div style={{ fontSize: 9, color: C.text3, paddingLeft: 6, borderLeft: `1px solid ${C.border}`, lineHeight: 1.5 }}>
+              {state.tricksLeft}<br /><span style={{ fontSize: '0.85em' }}>{tr.tricks}</span>
+            </div>
+          )}
           {multiMode && (
-            <div style={{ fontSize: 'clamp(8px,1.3vw,10px)', color: C.text3, paddingLeft: 6, borderLeft: `1px solid ${C.border}` }}>
-              {tr.room}<br /><span style={{ color: C.amber, fontWeight: 700, letterSpacing: '0.15em' }}>{roomId}</span>
+            <div style={{ fontSize: isMobile ? 9 : 9, color: C.text3, paddingLeft: isMobile ? 0 : 6, borderLeft: isMobile ? 'none' : `1px solid ${C.border}` }}>
+              {isMobile ? '' : <>{tr.room}<br /></>}<span style={{ color: C.gold, fontWeight: 700, letterSpacing: '0.15em' }}>{roomId}</span>
             </div>
           )}
         </div>
@@ -1549,23 +1562,32 @@ export default function Sueca() {
         flex: 1, position: 'relative', zIndex: 5,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'space-between',
-        padding: `${Math.round(16 * scale)}px ${Math.round(12 * scale)}px ${Math.round(10 * scale)}px`,
+        padding: isMobile
+          ? `${Math.round(10 * scale)}px ${Math.round(6 * scale)}px ${Math.round(6 * scale)}px`
+          : `${Math.round(16 * scale)}px ${Math.round(12 * scale)}px ${Math.round(10 * scale)}px`,
         gap: Math.round(6 * scale),
       }}>
 
         {/* North player */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(5 * scale) }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(6 * scale) }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(4 * scale) }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(5 * scale) }}>
             {multiMode && <VideoTile stream={rtc.remoteStreams[topPos]} scale={scale} />}
             {playerLabel(topPos)}
           </div>
           <NorthHand count={state.hands[topPos].length} scale={scale} />
         </div>
 
-        {/* Middle row */}
+        {/* Middle row — fixed-width side columns on mobile prevent overflow */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: middleGap, width: '100%' }}>
-          {/* Left */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale), minWidth: sideMinW }}>
+
+          {/* Left player */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: Math.round(4 * scale),
+            width: isMobile ? sideColW : undefined,
+            minWidth: isMobile ? undefined : Math.round(90 * scale),
+            flexShrink: 0,
+          }}>
             {playerLabel(leftPos)}
             {multiMode && <VideoTile stream={rtc.remoteStreams[leftPos]} scale={scale} />}
             <SideHand count={state.hands[leftPos].length} side="left" scale={scale} />
@@ -1577,7 +1599,8 @@ export default function Sueca() {
             background: 'rgba(255,255,255,0.02)',
             borderRadius: Math.round(20 * scale),
             border: `1px solid ${C.border}`,
-            padding: Math.round(8 * scale),
+            padding: Math.round(isMobile ? 4 : 8) * scale,
+            flexShrink: 0,
           }}>
             <TrickArea
               trick={state.trick}
@@ -1589,30 +1612,38 @@ export default function Sueca() {
             />
           </div>
 
-          {/* Right */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale), minWidth: sideMinW }}>
+          {/* Right player */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: Math.round(4 * scale),
+            width: isMobile ? sideColW : undefined,
+            minWidth: isMobile ? undefined : Math.round(90 * scale),
+            flexShrink: 0,
+          }}>
             {playerLabel(rightPos)}
             {multiMode && <VideoTile stream={rtc.remoteStreams[rightPos]} scale={scale} />}
             <SideHand count={state.hands[rightPos].length} side="right" scale={scale} />
           </div>
         </div>
 
-        {/* Message bar */}
-        <div style={{
-          padding: `${Math.round(8 * scale)}px ${Math.round(24 * scale)}px`,
-          borderRadius: 30,
-          maxWidth: Math.round(460 * scale), width: '100%',
-          background: isYourTurn ? C.greenDim : 'rgba(255,255,255,0.03)',
-          border: `1px solid ${isYourTurn ? C.greenBrd : C.border}`,
-          boxShadow: isYourTurn ? `0 0 20px rgba(34,197,94,0.12)` : 'none',
-          fontSize: msgFs, fontWeight: 500,
-          color: isYourTurn ? C.goldBrt : C.text2,
-          textAlign: 'center', transition: 'all 0.25s',
-          letterSpacing: '0.01em',
-        }}>
-          {isYourTurn ? (lang === 'pt' ? '✦ Sua vez!' : '✦ Your turn!') : state.msg}
-          {isYourTurn && sel && (lang === 'pt' ? ' · Clique novamente para jogar!' : ' · Click again to play!')}
-        </div>
+        {/* Message bar — hidden on mobile when PLAY button is shown */}
+        {!(isMobile && isYourTurn && sel) && (
+          <div style={{
+            padding: `${Math.round(7 * scale)}px ${Math.round(20 * scale)}px`,
+            borderRadius: 30,
+            maxWidth: Math.round(460 * scale), width: '100%',
+            background: isYourTurn ? C.goldDim : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${isYourTurn ? C.goldBrd : C.border}`,
+            boxShadow: isYourTurn ? `0 0 18px rgba(201,162,39,0.15)` : 'none',
+            fontSize: msgFs, fontWeight: 500,
+            color: isYourTurn ? C.goldBrt : C.text2,
+            textAlign: 'center', transition: 'all 0.25s',
+          }}>
+            {isYourTurn
+              ? (isMobile ? (lang === 'pt' ? '✦ Sua vez!' : '✦ Your turn!') : (lang === 'pt' ? '✦ Sua vez! · Selecione uma carta' : '✦ Your turn! · Select a card'))
+              : state.msg}
+          </div>
+        )}
 
         {/* Your hand */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(6 * scale) }}>
@@ -1628,38 +1659,74 @@ export default function Sueca() {
               onReorder={(from, to) => dispatch({ type: 'REORDER_HAND', from, to, pi: perspective })}
             />
           </div>
+
+          {/* Controls row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * scale), flexWrap: 'wrap', justifyContent: 'center' }}>
             {multiMode && rtc.localStream && (
               <VideoTile stream={rtc.localStream} muted mirror scale={scale} />
             )}
-            {/* You label */}
             <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', borderRadius: 20,
-              background: 'rgba(34,197,94,0.1)', border: `1px solid ${C.greenBrd}`,
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: isMobile ? '4px 10px' : '5px 12px', borderRadius: 20,
+              background: C.goldDim, border: `1px solid ${C.goldBrd}`,
               fontSize: labelFs, fontWeight: 600, color: C.goldBrt,
             }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.gold, boxShadow: `0 0 5px ${C.gold}` }} />
               {getName(perspective)}
             </div>
-            {/* Auto sort */}
             <button
               onClick={() => dispatch({ type: 'AUTO_ORDER_HAND', pi: perspective })}
               style={{
-                padding: `5px ${Math.round(14 * scale)}px`,
+                padding: isMobile ? '4px 12px' : `5px ${Math.round(14 * scale)}px`,
                 borderRadius: 20, fontSize: labelFs, fontWeight: 500,
-                background: 'rgba(255,255,255,0.05)',
-                border: `1px solid ${C.border2}`,
+                background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border2}`,
                 color: C.text2, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 5,
-                transition: 'all 0.15s',
               }}
             >
               ⇅ {lang === 'pt' ? 'Ordenar' : 'Sort'}
             </button>
+            {isMobile && (
+              <div style={{ fontSize: 9, color: C.text3 }}>
+                {state.tricksLeft} {tr.tricks}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* ── Big PLAY button — mobile only, shown when a card is selected ── */}
+      {isMobile && isYourTurn && sel && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 60,
+          padding: '12px 16px 20px',
+          background: 'linear-gradient(to top, rgba(8,8,8,0.98) 60%, transparent)',
+          display: 'flex', gap: 10,
+        }}>
+          <button
+            onClick={() => dispatch({ type: 'PLAY', pi: perspective, card: sel })}
+            style={{
+              flex: 1, padding: '15px 0',
+              background: `linear-gradient(135deg, ${C.gold}, #8a6010)`,
+              border: 'none', borderRadius: 14,
+              color: '#1a0f00', fontWeight: 800, fontSize: 18,
+              letterSpacing: '0.08em', cursor: 'pointer',
+              boxShadow: `0 4px 24px rgba(201,162,39,0.45)`,
+            }}
+          >
+            {lang === 'pt' ? '▶ JOGAR' : '▶ PLAY'}
+          </button>
+          <button
+            onClick={() => dispatch({ type: 'SEL', card: null, pi: perspective })}
+            style={{
+              padding: '15px 18px',
+              background: 'rgba(255,255,255,0.06)', border: `1px solid ${C.border2}`,
+              borderRadius: 14, color: C.text2, fontWeight: 600, fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >✕</button>
+        </div>
+      )}
 
       {/* Round end overlay */}
       {state.phase === 'round_end' && (
@@ -1730,10 +1797,11 @@ export default function Sueca() {
           0%   { transform: rotate(-12deg) scale(1.05); }
           100% { transform: rotate(12deg)  scale(1.15); }
         }
+        button { touch-action: manipulation; }
         button:hover { opacity: 0.85; }
         button:active { transform: scale(0.96) !important; }
         input::placeholder { color: #3a4d62; }
-        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; user-select: none; }
       `}</style>
     </div>
   );
