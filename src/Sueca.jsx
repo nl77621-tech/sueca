@@ -8,9 +8,9 @@ const useGameScale = () => {
   const calc = () => {
     const w = window.innerWidth;
     const isMobile = w < 520;
-    // On mobile use a tighter divisor so cards fill more of the screen
+    // Mobile divisor of 640 keeps cards comfortably sized while fitting the layout
     const scale = isMobile
-      ? Math.min(0.72, Math.max(0.42, w / 600))
+      ? Math.min(0.68, Math.max(0.42, w / 640))
       : Math.min(1, Math.max(0.72, w / 800));
     return { scale, isMobile };
   };
@@ -1606,13 +1606,15 @@ export default function Sueca() {
   const sideColW  = Math.round(84 * scale); // matches SideHand visual width (rotated card height)
   const middleGap = isMobile ? Math.round(6 * scale) : Math.round(20 * scale);
 
-  // Compute a separate scale for TrickArea so it always fits the available horizontal space.
-  // TrickArea total width = 3*(160*ts) + 2*(10*ts) + 2*((isMobile?4:8)*ts) = ts * (480+20+8|16) = ts*508 or ts*516
+  // Compute a separate scale for TrickArea so it ALWAYS fits available horizontal space.
+  // Safety margin of 20px absorbs: 2px border, 4px container-padding, and ~14px of
+  // accumulated Math.round rounding across 3 cells + 2 gaps.
   const tablePadH = isMobile ? Math.round(6 * scale) : Math.round(12 * scale);
   const availW = (typeof window !== 'undefined' ? window.innerWidth : 390) - tablePadH * 2;
-  const trickMaxW = availW - sideColW * 2 - middleGap * 2;
-  const trickGridFactor = isMobile ? 508 : 516; // 3*160 + 2*10 + 2*(4 or 8)
-  const trickScale = Math.min(scale, trickMaxW / trickGridFactor);
+  const trickSafety = isMobile ? 20 : 16;
+  const trickMaxW = Math.max(60, availW - sideColW * 2 - middleGap * 2 - trickSafety);
+  // Grid factor = 3*160 + 2*10 = 500 (padding computed separately in trickSafety)
+  const trickScale = Math.min(scale, trickMaxW / 500);
   const labelFs   = Math.max(9, Math.round(11 * scale));
   const msgFs     = Math.max(11, Math.round(14 * scale));
   const dealerName = state.dealer === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.dealer);
@@ -1651,7 +1653,7 @@ export default function Sueca() {
       background: `radial-gradient(ellipse at 50% 40%, #1f4a2e 0%, #122b1e 45%, ${C.bg} 100%)`,
       fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
       color: C.text1,
-      display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', position: 'relative', overflowX: 'hidden', overflowY: 'visible',
     }}>
       {/* Subtle noise/grain layer */}
       <div style={{
@@ -1790,6 +1792,9 @@ export default function Sueca() {
             boxShadow: 'inset 0 2px 16px rgba(0,0,0,0.3)',
             padding: Math.round(isMobile ? 4 : 8) * trickScale,
             flexShrink: 0,
+            // Hard CSS backstop — if rounding still overflows, clip silently
+            maxWidth: isMobile ? trickMaxW : undefined,
+            overflow: 'hidden',
           }}>
             <TrickArea
               trick={state.trick}
