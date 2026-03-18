@@ -2022,6 +2022,7 @@ export default function Sueca() {
           touchAction: 'manipulation',
         }}>
           <button
+            onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); dispatch({ type: 'PLAY', pi: perspective, card: sel }); }}
             onClick={() => dispatch({ type: 'PLAY', pi: perspective, card: sel })}
             style={{
               flex: 1, padding: '15px 0',
@@ -2036,8 +2037,12 @@ export default function Sueca() {
             {lang === 'pt' ? '▶ JOGAR' : '▶ PLAY'}
           </button>
           <button
+            onTouchEnd={e => {
+              e.preventDefault(); e.stopPropagation();
+              if (multiMode) setLocalSel(null);
+              else dispatch({ type: 'SEL', card: null, pi: perspective });
+            }}
             onClick={() => {
-              // Clear selection directly — avoids dispatch({ card: null }) which throws in multiMode
               if (multiMode) setLocalSel(null);
               else dispatch({ type: 'SEL', card: null, pi: perspective });
             }}
