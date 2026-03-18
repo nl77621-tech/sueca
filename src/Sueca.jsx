@@ -2012,8 +2012,8 @@ export default function Sueca() {
         </div>
       </div>
 
-      {/* ── Big PLAY button — mobile only, shown when a card is selected ── */}
-      {isMobile && isYourTurn && sel && (
+      {/* ── Big PLAY button — solo mobile only (online uses direct card tap) ── */}
+      {isMobile && !multiMode && isYourTurn && sel && (
         <div style={{
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 60,
           padding: '12px 16px 20px',
