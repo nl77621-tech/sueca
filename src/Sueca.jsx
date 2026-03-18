@@ -387,8 +387,8 @@ const CardBack = ({ small, rotated, scale = 1 }) => {
   return (
     <div style={{
       width: rotated ? h : w, height: rotated ? w : h, borderRadius: br,
-      background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #1e3a8a 100%)',
-      border: '2px solid #60a5fa',
+      background: 'linear-gradient(135deg, #1a3a6a 0%, #2255b0 50%, #1a3a6a 100%)',
+      border: '2px solid #5b8edb',
       boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
       position: 'relative', overflow: 'hidden', flexShrink: 0,
     }}>
@@ -615,13 +615,13 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
 
   // Colors
   const G = {
-    bg: '#0a0a0a', surface: '#111', card: '#161616', cardHover: '#1a1a1a',
-    gold: '#c9a227', goldBrt: '#e8c84a', goldDim: 'rgba(201,162,39,0.08)',
-    goldBrd: 'rgba(201,162,39,0.25)', goldGlow: 'rgba(201,162,39,0.15)',
+    bg: '#0e2318', surface: '#122b1e', card: '#163323', cardHover: '#1c3d29',
+    gold: '#d4a827', goldBrt: '#f5c842', goldDim: 'rgba(212,168,39,0.15)',
+    goldBrd: 'rgba(212,168,39,0.38)', goldGlow: 'rgba(212,168,39,0.2)',
     green: '#22c55e', greenDim: 'rgba(34,197,94,0.12)',
     red: '#ef4444', redDim: 'rgba(239,68,68,0.12)',
     purple: '#8b5cf6', purpleDim: 'rgba(139,92,246,0.12)', purpleBrd: 'rgba(139,92,246,0.3)',
-    t1: '#f5f0e8', t2: '#8a7e6b', t3: '#3d3528', t4: '#252015',
+    t1: '#f5f0e8', t2: '#9aab9a', t3: '#4a6a4a', t4: '#1e3828',
     font: "'Inter','Segoe UI',system-ui,sans-serif",
   };
 
@@ -733,7 +733,7 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
   return (
     <div style={{
       minHeight: '100dvh',
-      background: `radial-gradient(ellipse at 50% 40%, #1a1408 0%, ${G.bg} 60%)`,
+      background: `radial-gradient(ellipse at 50% 40%, #1f4a2e 0%, #0e2318 60%)`,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       fontFamily: G.font, color: G.t1,
       padding: '0 16px env(safe-area-inset-bottom, 16px)',
@@ -812,7 +812,7 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
           width: '70%', height: '60%',
           top: '20%', left: '15%',
           borderRadius: '50%',
-          background: `radial-gradient(ellipse at 50% 45%, #1c1a10 0%, #121008 60%, ${G.bg} 100%)`,
+          background: `radial-gradient(ellipse at 50% 45%, #1f4a2e 0%, #122b1e 60%, ${G.bg} 100%)`,
           border: `1.5px solid ${G.goldBrd}`,
           boxShadow: `0 0 60px ${G.goldGlow}, inset 0 0 40px rgba(0,0,0,0.5)`,
         }}>
@@ -978,9 +978,9 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError, lang, 
   const [loading, setLoading] = useState(false);
 
   const W = {
-    bg: '#0a0a0a', card: '#111', t1: '#f5f0e8', t2: '#8a7e6b', t3: '#3d3528', t4: '#252015',
-    gold: '#c9a227', goldBrt: '#e8c84a', goldDim: 'rgba(201,162,39,0.08)', goldBrd: 'rgba(201,162,39,0.25)',
-    goldGlow: 'rgba(201,162,39,0.15)',
+    bg: '#0e2318', card: '#122b1e', t1: '#f5f0e8', t2: '#9aab9a', t3: '#4a6a4a', t4: '#1e3828',
+    gold: '#d4a827', goldBrt: '#f5c842', goldDim: 'rgba(212,168,39,0.15)', goldBrd: 'rgba(212,168,39,0.38)',
+    goldGlow: 'rgba(212,168,39,0.2)',
     green: '#22c55e', greenDim: 'rgba(34,197,94,0.12)',
     font: "'Inter','Segoe UI',system-ui,sans-serif",
   };
@@ -998,7 +998,7 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError, lang, 
   return (
     <div style={{
       minHeight: '100dvh',
-      background: `radial-gradient(ellipse at 50% 30%, #1a1408 0%, ${W.bg} 60%)`,
+      background: `radial-gradient(ellipse at 50% 30%, #1f4a2e 0%, #0e2318 60%)`,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       fontFamily: W.font, color: W.t1, padding: 24,
       position: 'relative', overflow: 'hidden',
@@ -1574,37 +1574,45 @@ export default function Sueca() {
     state.hands[state.dealer] &&
     state.hands[state.dealer].some(c => c.id === state.trumpCard.id);
 
-  // ── Design tokens — Black & Gold ──
+  // ── Design tokens — Green Felt & Gold ──
   const C = {
-    bg:       '#080808',
-    surface:  '#101010',
-    surface2: '#181818',
-    border:   'rgba(212,160,23,0.1)',
-    border2:  'rgba(212,160,23,0.22)',
+    bg:       '#0e2318',          // rich dark green
+    surface:  '#122b1e',
+    surface2: '#163323',
+    border:   'rgba(212,160,23,0.18)',
+    border2:  'rgba(212,160,23,0.32)',
     text1:    '#f5f0e8',
-    text2:    '#857a68',
-    text3:    '#3d3528',
+    text2:    '#a09070',
+    text3:    '#5a6e5a',
     // Gold — primary accent
-    gold:     '#c9a227',
-    goldBrt:  '#f0c040',
-    goldDim:  'rgba(201,162,39,0.13)',
-    goldBrd:  'rgba(201,162,39,0.38)',
-    // Aliases so all existing C.green / C.amber refs map to gold
-    green:    '#c9a227',
-    greenDim: 'rgba(201,162,39,0.13)',
-    greenBrd: 'rgba(201,162,39,0.38)',
-    amber:    '#c9a227',
-    amberDim: 'rgba(201,162,39,0.13)',
-    amberBrd: 'rgba(201,162,39,0.38)',
+    gold:     '#d4a827',
+    goldBrt:  '#f5c842',
+    goldDim:  'rgba(212,168,39,0.18)',
+    goldBrd:  'rgba(212,168,39,0.45)',
+    // Aliases
+    green:    '#d4a827',
+    greenDim: 'rgba(212,168,39,0.18)',
+    greenBrd: 'rgba(212,168,39,0.45)',
+    amber:    '#d4a827',
+    amberDim: 'rgba(212,168,39,0.18)',
+    amberBrd: 'rgba(212,168,39,0.45)',
     // Red — opponent accent
-    red:      '#c44',
-    redDim:   'rgba(204,68,68,0.1)',
-    redBrd:   'rgba(204,68,68,0.28)',
-    purple:   '#9b7fe8',
+    red:      '#e05555',
+    redDim:   'rgba(224,85,85,0.15)',
+    redBrd:   'rgba(224,85,85,0.38)',
+    purple:   '#b09ae8',
   };
 
   const sideColW  = Math.round(84 * scale); // matches SideHand visual width (rotated card height)
   const middleGap = isMobile ? Math.round(6 * scale) : Math.round(20 * scale);
+
+  // Compute a separate scale for TrickArea so it always fits the available horizontal space.
+  // TrickArea total width = 3*(160*ts) + 2*(10*ts) + 2*((isMobile?4:8)*ts) = ts * (480+20+8|16) = ts*508 or ts*516
+  const tablePadH = isMobile ? Math.round(6 * scale) : Math.round(12 * scale);
+  const availW = (typeof window !== 'undefined' ? window.innerWidth : 390) - tablePadH * 2;
+  const trickMaxW = availW - sideColW * 2 - middleGap * 2;
+  const trickGridFactor = isMobile ? 508 : 516; // 3*160 + 2*10 + 2*(4 or 8)
+  const trickScale = Math.min(scale, trickMaxW / trickGridFactor);
   const labelFs   = Math.max(9, Math.round(11 * scale));
   const msgFs     = Math.max(11, Math.round(14 * scale));
   const dealerName = state.dealer === perspective ? (lang === 'pt' ? 'Você' : 'You') : getName(state.dealer);
@@ -1640,7 +1648,7 @@ export default function Sueca() {
   return (
     <div style={{
       minHeight: '100dvh',
-      background: `radial-gradient(ellipse at 50% 30%, #1a1408 0%, ${C.bg} 65%)`,
+      background: `radial-gradient(ellipse at 50% 40%, #1f4a2e 0%, #122b1e 45%, ${C.bg} 100%)`,
       fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
       color: C.text1,
       display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden',
@@ -1657,7 +1665,7 @@ export default function Sueca() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: isMobile ? '0 10px' : '0 16px',
         height: isMobile ? 44 : 52,
-        background: 'rgba(8,8,8,0.85)',
+        background: 'rgba(8,24,14,0.92)',
         borderBottom: `1px solid ${C.border}`,
         backdropFilter: 'blur(12px)',
         gap: isMobile ? 6 : 8, flexShrink: 0,
@@ -1776,17 +1784,18 @@ export default function Sueca() {
           {/* Centre trick area */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(255,255,255,0.02)',
-            borderRadius: Math.round(20 * scale),
+            background: 'rgba(10,40,22,0.55)',
+            borderRadius: Math.round(20 * trickScale),
             border: `1px solid ${C.border}`,
-            padding: Math.round(isMobile ? 4 : 8) * scale,
+            boxShadow: 'inset 0 2px 16px rgba(0,0,0,0.3)',
+            padding: Math.round(isMobile ? 4 : 8) * trickScale,
             flexShrink: 0,
           }}>
             <TrickArea
               trick={state.trick}
               trickWinner={state.phase === 'resolving' ? state.trickWinner : null}
               perspective={perspective}
-              scale={scale}
+              scale={trickScale}
               trumpCard={trumpCardHeld ? state.trumpCard : null}
               trumpLabel={tr.trumpLabel}
             />
@@ -1812,7 +1821,7 @@ export default function Sueca() {
             padding: `${Math.round(7 * scale)}px ${Math.round(20 * scale)}px`,
             borderRadius: 30,
             maxWidth: Math.round(460 * scale), width: '100%',
-            background: isYourTurn ? C.goldDim : 'rgba(255,255,255,0.03)',
+            background: isYourTurn ? C.goldDim : 'rgba(10,40,22,0.4)',
             border: `1px solid ${isYourTurn ? C.goldBrd : C.border}`,
             boxShadow: isYourTurn ? `0 0 18px rgba(201,162,39,0.15)` : 'none',
             fontSize: msgFs, fontWeight: 500,
