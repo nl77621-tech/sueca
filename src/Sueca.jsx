@@ -1941,7 +1941,7 @@ export default function Sueca() {
       {/* Floating media controls (multiplayer only) */}
       {multiMode && (
         <div style={{
-          position: 'fixed', bottom: 14, right: 14, zIndex: 50,
+          position: 'fixed', bottom: 14, right: 80, zIndex: 50,
           display: 'flex', gap: 6, alignItems: 'center',
           background: 'rgba(0,0,0,0.5)', borderRadius: 30, padding: '6px 10px',
           border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(6px)',
