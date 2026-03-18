@@ -1523,6 +1523,7 @@ export default function Sueca() {
   const dispatch = useCallback((action) => {
     if (multiMode && wsRef.current?.readyState === 1) {
       if (action.type === 'SEL') {
+        if (!action.card) { setLocalSel(null); return; }
         setLocalSel(prev => prev?.id === action.card.id ? null : action.card);
         return;
       }
@@ -2018,6 +2019,7 @@ export default function Sueca() {
           padding: '12px 16px 20px',
           background: 'linear-gradient(to top, rgba(8,8,8,0.98) 60%, transparent)',
           display: 'flex', gap: 10,
+          touchAction: 'manipulation',
         }}>
           <button
             onClick={() => dispatch({ type: 'PLAY', pi: perspective, card: sel })}
@@ -2028,17 +2030,22 @@ export default function Sueca() {
               color: '#1a0f00', fontWeight: 800, fontSize: 18,
               letterSpacing: '0.08em', cursor: 'pointer',
               boxShadow: `0 4px 24px rgba(201,162,39,0.45)`,
+              touchAction: 'manipulation', userSelect: 'none', WebkitUserSelect: 'none',
             }}
           >
             {lang === 'pt' ? '▶ JOGAR' : '▶ PLAY'}
           </button>
           <button
-            onClick={() => dispatch({ type: 'SEL', card: null, pi: perspective })}
+            onClick={() => {
+              // Clear selection directly — avoids dispatch({ card: null }) which throws in multiMode
+              if (multiMode) setLocalSel(null);
+              else dispatch({ type: 'SEL', card: null, pi: perspective });
+            }}
             style={{
               padding: '15px 18px',
               background: 'rgba(255,255,255,0.06)', border: `1px solid ${C.border2}`,
               borderRadius: 14, color: C.text2, fontWeight: 600, fontSize: 14,
-              cursor: 'pointer',
+              cursor: 'pointer', touchAction: 'manipulation',
             }}
           >✕</button>
         </div>
