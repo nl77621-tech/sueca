@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { reduce, aiPick, INIT } from './src/gameLogic.js';
+import { reduce, aiPick, INIT, DEFAULT_SETTINGS } from './src/gameLogic.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -30,7 +30,9 @@ const broadcast = (room) => {
   const playerInfo = room.players.map(p => ({
     position: p.position, name: p.name, connected: p.connected, isBot: p.isBot || false,
   }));
-  const payload = JSON.stringify({ type: 'STATE_UPDATE', state: room.state, players: playerInfo });
+  const s = room.state.settings || DEFAULT_SETTINGS;
+  const roomSettings = { setLength: s.setLength, bandeira: s.bandeira, botSpeed: s.botSpeed };
+  const payload = JSON.stringify({ type: 'STATE_UPDATE', state: room.state, players: playerInfo, roomSettings });
   for (const p of room.players) {
     if (p.ws?.readyState === 1) p.ws.send(payload);
   }
@@ -47,6 +49,10 @@ const scheduleAI = (room) => {
   }
 
   clearTimeout(room.aiTimer);
+  const spd = room.state.settings?.botSpeed || 'normal';
+  const aiDelay = spd === 'fast' ? 300 + Math.random() * 200
+                : spd === 'slow' ? 1800 + Math.random() * 800
+                :                   800 + Math.random() * 400;
   room.aiTimer = setTimeout(() => {
     const r = rooms.get(room.id);
     if (!r) return;
@@ -70,7 +76,7 @@ const scheduleAI = (room) => {
     r.state = s;
     broadcast(r);
     scheduleAI(r);
-  }, 800 + Math.random() * 400);
+  }, aiDelay);
 };
 
 // ── WebSocket handler ─────────────────────────────────────────
@@ -88,7 +94,7 @@ wss.on('connection', (ws) => {
       const roomId = genId();
       const room = {
         id: roomId,
-        state: { ...INIT },
+        state: { ...INIT, settings: { ...DEFAULT_SETTINGS } },
         players: [{ ws, name: msg.name || 'Jogador 1', position: 0, connected: true }],
         aiTimer: null,
       };
@@ -142,7 +148,21 @@ wss.on('connection', (ws) => {
       const roomId = msg.roomId?.toUpperCase().trim();
       const room = rooms.get(roomId);
       if (!room) { send({ type: 'ERROR', message: 'Sala não encontrada' }); return; }
-      if (room.state.phase !== 'welcome') { send({ type: 'ERROR', message: 'O jogo já começou — use o mesmo link para rejoin' }); return; }
+
+      if (room.state.phase !== 'welcome') {
+        // Game in progress — try to reconnect to a disconnected seat
+        const seat = room.players.find(p => !p.isBot && (!p.connected || !p.ws || p.ws.readyState !== 1));
+        if (!seat) { send({ type: 'ERROR', message: 'Jogo em curso e sem lugares disponíveis' }); return; }
+        if (seat.ws && seat.ws !== ws && seat.ws.readyState === 1) seat.ws.close();
+        seat.ws = ws; seat.connected = true;
+        if (msg.name) seat.name = msg.name;
+        myRoomId = roomId; myPosition = seat.position;
+        send({ type: 'REJOINED', roomId, position: seat.position });
+        broadcast(room);
+        scheduleAI(room);
+        return;
+      }
+
       const taken = new Set(room.players.map(p => p.position));
       const pos = [1, 2, 3].find(p => !taken.has(p));
       if (pos === undefined) { send({ type: 'ERROR', message: 'Sala cheia (4/4)' }); return; }
@@ -158,8 +178,11 @@ wss.on('connection', (ws) => {
       const room = rooms.get(roomId);
       if (!room) { send({ type: 'ERROR', message: 'Sala não encontrada' }); return; }
       const claimedPos = parseInt(msg.position, 10);
-      const player = room.players.find(p => p.position === claimedPos && !p.connected);
+      // Accept rejoin even if old WS is still technically open (page refresh race)
+      const player = room.players.find(p => p.position === claimedPos && !p.isBot &&
+        (!p.connected || !p.ws || p.ws.readyState !== 1));
       if (!player) { send({ type: 'ERROR', message: 'Lugar não disponível' }); return; }
+      if (player.ws && player.ws !== ws && player.ws.readyState === 1) player.ws.close();
       player.ws = ws;
       player.connected = true;
       if (msg.name) player.name = msg.name;
@@ -167,7 +190,24 @@ wss.on('connection', (ws) => {
       myPosition = claimedPos;
       send({ type: 'REJOINED', roomId, position: claimedPos });
       broadcast(room);
-      scheduleAI(room); // AI was covering this seat; re-check if it should stand down
+      scheduleAI(room);
+    }
+
+    else if (msg.type === 'UPDATE_SETTINGS') {
+      const room = rooms.get(myRoomId);
+      if (!room || room.state.phase !== 'welcome') return;
+      if (myPosition !== 0) return; // creator only
+      const { setLength, bandeira, botSpeed } = msg.settings || {};
+      const cur = room.state.settings || { ...DEFAULT_SETTINGS };
+      room.state = {
+        ...room.state,
+        settings: {
+          setLength:  setLength  !== undefined ? Number(setLength)   : cur.setLength,
+          bandeira:   bandeira   !== undefined ? Boolean(bandeira)   : cur.bandeira,
+          botSpeed:   botSpeed   !== undefined ? String(botSpeed)    : cur.botSpeed,
+        },
+      };
+      broadcast(room);
     }
 
     else if (['RTC_READY', 'RTC_OFFER', 'RTC_ANSWER', 'RTC_ICE'].includes(msg.type)) {

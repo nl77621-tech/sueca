@@ -46,6 +46,11 @@ const T = {
     chooseSeat: 'Escolhe o teu lugar · Equipas: Sul+Norte vs Oeste+Este',
     youLabel: 'VOCÊ', sitHere: '+ Sentar aqui', waiting: 'Aguardando…',
     addBot: '🤖 Adicionar Bot', removeBot: '✕ Remover',
+    settings: 'Configurações', settingsTitle: '⚙ Configurações',
+    setLengthLabel: 'Pts para ganhar set', bandeiraRule: 'Regra Bandeira',
+    bandeiraHint: 'Duplos pontos se adversário marca 0',
+    botSpeed: 'Velocidade dos Bots', botSlow: 'Lento', botNormal: 'Normal', botFast: 'Rápido',
+    creatorOnly: 'Só o criador pode alterar',
     teamA: 'EQUIPA A', teamB: 'EQUIPA B',
     scanQr: 'Digitalizar para entrar',
     copyLink: '🔗 Copiar Link', copied: '✓ Copiado!',
@@ -82,6 +87,11 @@ const T = {
     chooseSeat: 'Choose your seat · Teams: South+North vs West+East',
     youLabel: 'YOU', sitHere: '+ Sit here', waiting: 'Waiting…',
     addBot: '🤖 Add Bot', removeBot: '✕ Remove',
+    settings: 'Settings', settingsTitle: '⚙ Room Settings',
+    setLengthLabel: 'Points to win set', bandeiraRule: 'Bandeira Rule',
+    bandeiraHint: 'Double points if opponent scores 0',
+    botSpeed: 'Bot Speed', botSlow: 'Slow', botNormal: 'Normal', botFast: 'Fast',
+    creatorOnly: 'Only the creator can change settings',
     teamA: 'TEAM A', teamB: 'TEAM B',
     scanQr: 'Scan to join',
     copyLink: '🔗 Copy Link', copied: '✓ Copied!',
@@ -604,7 +614,7 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard =
 // LOBBY SCREEN — Visual Card Table
 // ═══════════════════════════════════════════
 const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
-                 onAddBot, onRemoveBot,
+                 onAddBot, onRemoveBot, roomSettings, onUpdateSettings,
                  localStream, onEnableMedia, onDisableMedia,
                  audioEnabled, videoEnabled, onToggleAudio, onToggleVideo, lang }) => {
   const tr = T[lang];
@@ -612,6 +622,8 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(gameUrl)}&color=c9a227&bgcolor=0a0a0a`;
   const [copied, setCopied] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const cfg = roomSettings || { setLength: 4, bandeira: true, botSpeed: 'normal' };
 
   const copyLink = () => {
     navigator.clipboard.writeText(gameUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
@@ -936,6 +948,95 @@ const Lobby = ({ roomId, players, myPosition, onStart, onLeave, onChangeSeat,
         )}
       </div>
 
+      {/* ── Settings panel ── */}
+      <div style={{ width: '100%', maxWidth: 380, marginTop: 6, flexShrink: 0 }}>
+        <button onClick={() => setShowSettings(p => !p)} style={{
+          width: '100%', padding: '10px 14px', borderRadius: 12,
+          background: showSettings ? `rgba(212,168,39,0.1)` : G.card,
+          border: `1px solid ${showSettings ? G.goldBrd : G.t4}`,
+          color: showSettings ? G.gold : G.t2, cursor: 'pointer', fontFamily: G.font, fontSize: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span>{tr.settingsTitle}</span>
+          <span style={{ fontSize: 10, transform: showSettings ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+        </button>
+
+        {showSettings && (
+          <div style={{
+            marginTop: 6, padding: '14px 16px', borderRadius: 12,
+            background: G.card, border: `1px solid ${G.t4}`,
+            display: 'flex', flexDirection: 'column', gap: 14,
+          }}>
+            {!isCreator && (
+              <div style={{ fontSize: 10, color: G.t3, textAlign: 'center', fontStyle: 'italic' }}>
+                {tr.creatorOnly}
+              </div>
+            )}
+
+            {/* Set length */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 12, color: G.t1, fontWeight: 600 }}>{tr.setLengthLabel}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {[2, 4].map(n => (
+                  <button key={n} onClick={() => isCreator && onUpdateSettings({ setLength: n })}
+                    style={{
+                      padding: '5px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                      border: `1px solid ${cfg.setLength === n ? G.goldBrd : G.t4}`,
+                      background: cfg.setLength === n ? `rgba(212,168,39,0.15)` : 'transparent',
+                      color: cfg.setLength === n ? G.gold : G.t2,
+                      cursor: isCreator ? 'pointer' : 'default', fontFamily: G.font,
+                      opacity: !isCreator ? 0.6 : 1,
+                    }}>{n}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bandeira rule */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 12, color: G.t1, fontWeight: 600 }}>{tr.bandeiraRule}</div>
+                <div style={{ fontSize: 10, color: G.t3, marginTop: 2 }}>{tr.bandeiraHint}</div>
+              </div>
+              <button onClick={() => isCreator && onUpdateSettings({ bandeira: !cfg.bandeira })}
+                style={{
+                  padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  border: `1px solid ${cfg.bandeira ? 'rgba(34,197,94,0.4)' : G.t4}`,
+                  background: cfg.bandeira ? 'rgba(34,197,94,0.12)' : 'transparent',
+                  color: cfg.bandeira ? '#86efac' : G.t2,
+                  cursor: isCreator ? 'pointer' : 'default', fontFamily: G.font,
+                  opacity: !isCreator ? 0.6 : 1, minWidth: 56, textAlign: 'center',
+                }}>
+                {cfg.bandeira ? (lang === 'pt' ? 'Ativa' : 'On') : (lang === 'pt' ? 'Desativa' : 'Off')}
+              </button>
+            </div>
+
+            {/* Bot speed */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ fontSize: 12, color: G.t1, fontWeight: 600 }}>{tr.botSpeed}</div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {[
+                  { k: 'slow',   label: tr.botSlow },
+                  { k: 'normal', label: tr.botNormal },
+                  { k: 'fast',   label: tr.botFast },
+                ].map(({ k, label }) => (
+                  <button key={k} onClick={() => isCreator && onUpdateSettings({ botSpeed: k })}
+                    style={{
+                      padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                      border: `1px solid ${cfg.botSpeed === k ? G.goldBrd : G.t4}`,
+                      background: cfg.botSpeed === k ? `rgba(212,168,39,0.15)` : 'transparent',
+                      color: cfg.botSpeed === k ? G.gold : G.t2,
+                      cursor: isCreator ? 'pointer' : 'default', fontFamily: G.font,
+                      opacity: !isCreator ? 0.6 : 1,
+                    }}>{label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── Bottom action area ── */}
       <div style={{
         width: '100%', maxWidth: 380,
@@ -1181,7 +1282,7 @@ const Welcome = ({ onSolo, onCreateRoom, onJoinRoom, wsError, clearError, lang, 
 // ═══════════════════════════════════════════
 // ROUND END OVERLAY
 // ═══════════════════════════════════════════
-const RoundEnd = ({ roundPts, gamePts, setPts, bandeira, setWon, perspective, players, onNewRound, onNewGame, lang }) => {
+const RoundEnd = ({ roundPts, gamePts, setPts, bandeira, setWon, perspective, players, onNewRound, onNewGame, lang, setLength = 4 }) => {
   const tr = T[lang];
   const myTeam = TEAM[perspective];
   const myPts = roundPts[myTeam], theirPts = roundPts[1 - myTeam];
@@ -1264,7 +1365,7 @@ const RoundEnd = ({ roundPts, gamePts, setPts, bandeira, setWon, perspective, pl
         {/* ── Game points progress (toward 4) ── */}
         <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: '#64748b' }}>{tr.gamesWon} ({tr.gamesTo4})</span>
+            <span style={{ fontSize: 11, color: '#64748b' }}>{tr.gamesWon} ({lang === 'pt' ? 'até' : 'to'} {setLength})</span>
             {earnedGP === 2 && (
               <span style={{ fontSize: 11, color: '#fbbf24', fontWeight: 'bold', background: 'rgba(251,191,36,0.15)', padding: '2px 8px', borderRadius: 10 }}>
                 {tr.doublePoints}
@@ -1278,7 +1379,7 @@ const RoundEnd = ({ roundPts, gamePts, setPts, bandeira, setWon, perspective, pl
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
               <span style={{ fontSize: 11, color: '#94a3b8', width: 26, textAlign: 'left', flexShrink: 0 }}>{label}</span>
               <div style={{ display: 'flex', gap: 3 }}>
-                {[0, 1, 2, 3].map(i => (
+                {Array.from({ length: setLength }, (_, i) => (
                   <div key={i} style={{
                     width: 14, height: 14, borderRadius: 3,
                     background: i < gp ? color : 'rgba(255,255,255,0.07)',
@@ -1287,7 +1388,7 @@ const RoundEnd = ({ roundPts, gamePts, setPts, bandeira, setWon, perspective, pl
                   }} />
                 ))}
               </div>
-              <span style={{ fontSize: 11, color, fontWeight: 'bold' }}>{gp}/4</span>
+              <span style={{ fontSize: 11, color, fontWeight: 'bold' }}>{gp}/{setLength}</span>
             </div>
           ))}
         </div>
@@ -1345,6 +1446,7 @@ export default function Sueca() {
   const [myPosition, setMyPosition] = useState(0);
   const [roomId, setRoomId] = useState(null);
   const [players, setPlayers] = useState([]);
+  const [roomSettings, setRoomSettings] = useState({ setLength: 4, bandeira: true, botSpeed: 'normal' });
   const [appView, setAppView] = useState('welcome'); // 'welcome' | 'lobby' | 'game'
   const [localSel, setLocalSel] = useState(null);
   const [wsError, setWsError] = useState('');
@@ -1400,6 +1502,7 @@ export default function Sueca() {
       if (s) saveSession(s.roomId, msg.position, s.name);
     } else if (msg.type === 'STATE_UPDATE') {
       setWsState(msg.state); setPlayers(msg.players);
+      if (msg.roomSettings) setRoomSettings(msg.roomSettings);
       if (msg.state.phase !== 'welcome') setAppView('game');
     } else if (msg.type === 'ERROR') {
       setIsRejoining(false); setWsError(msg.message);
@@ -1553,6 +1656,8 @@ export default function Sueca() {
         onChangeSeat={pos => wsRef.current?.send(JSON.stringify({ type: 'CHANGE_SEAT', toPosition: pos }))}
         onAddBot={() => wsRef.current?.send(JSON.stringify({ type: 'ADD_BOT' }))}
         onRemoveBot={pos => wsRef.current?.send(JSON.stringify({ type: 'REMOVE_BOT', position: pos }))}
+        roomSettings={roomSettings}
+        onUpdateSettings={s => wsRef.current?.send(JSON.stringify({ type: 'UPDATE_SETTINGS', settings: s }))}
         localStream={rtc.localStream}
         onEnableMedia={rtc.enableMedia}
         onDisableMedia={rtc.disableMedia}
@@ -1952,6 +2057,7 @@ export default function Sueca() {
           onNewRound={() => dispatch({ type: 'NEW_ROUND' })}
           onNewGame={() => dispatch({ type: 'START' })}
           lang={lang}
+          setLength={state.settings?.setLength ?? 4}
         />
       )}
 

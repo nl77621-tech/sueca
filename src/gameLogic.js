@@ -92,6 +92,12 @@ export const deal = dealer => {
 // ═══════════════════════════════════════════
 // REDUCER
 // ═══════════════════════════════════════════
+export const DEFAULT_SETTINGS = {
+  setLength: 4,    // game points needed to win a set (2 or 4)
+  bandeira: true,  // double points when opponent scores 0
+  botSpeed: 'normal', // 'slow' | 'normal' | 'fast'
+};
+
 export const INIT = {
   phase: 'welcome',
   hands: [[], [], [], []],
@@ -102,6 +108,7 @@ export const INIT = {
   tricksLeft: 10, msg: '', sel: null,
   bandeira: null,  // null | 0 | 1  — which team got all the cards
   setWon: null,    // null | 0 | 1  — which team just won the set
+  settings: { ...DEFAULT_SETTINGS },
 };
 
 export const reduce = (state, action) => {
@@ -111,6 +118,7 @@ export const reduce = (state, action) => {
       const { hands, trump, trumpCard, current, leader } = deal(dealer);
       return {
         ...INIT, phase: 'playing', hands, trump, trumpCard, current, leader, dealer,
+        settings: state.settings || INIT.settings, // preserve settings across restarts
         msg: `Trunfo: ${S[trump]}`,
       };
     }
@@ -124,6 +132,11 @@ export const reduce = (state, action) => {
         bandeira: null, setWon: null,
         msg: `Nova rodada! Trunfo: ${S[trump]}`,
       };
+    }
+    case 'UPDATE_SETTINGS': {
+      // Only allowed in welcome phase
+      if (state.phase !== 'welcome') return state;
+      return { ...state, settings: { ...state.settings, ...action.settings } };
     }
     case 'SEL': {
       const pi = action.pi ?? 0;
@@ -148,14 +161,15 @@ export const reduce = (state, action) => {
       const rp = [...state.roundPts]; rp[TEAM[w]] += tp;
       const tl = state.tricksLeft - 1;
       if (tl === 0) {
+        const cfg = state.settings || INIT.settings;
         const winner = rp[0] >= 61 ? 0 : 1;
         const loser  = 1 - winner;
-        const isBandeira = rp[loser] === 0;          // all 120 points — Bandeira!
-        const earnedGP   = rp[loser] < 30 ? 2 : 1;  // double if opponent < 30 pts
+        const isBandeira = cfg.bandeira && rp[loser] === 0; // Bandeira! (if rule enabled)
+        const earnedGP   = rp[loser] < 30 ? 2 : 1;         // double if opponent < 30 pts
         const gp = [...state.gamePts];
         gp[winner] += earnedGP;
         const sp = [...state.setPts];
-        const wonSet = gp[winner] >= 4;
+        const wonSet = gp[winner] >= cfg.setLength;
         if (wonSet) sp[winner]++;                    // set won — increment set counter
         return {
           ...state, hands: newH, trick: newT, trickWinner: w,
