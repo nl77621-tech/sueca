@@ -364,7 +364,8 @@ const Card = ({ card, onClick, hilite, sel, small, scale = 1 }) => {
       transform: sel ? `translateY(${Math.round(-14 * scale)}px)` : 'none',
       transition: 'all 0.18s cubic-bezier(.4,0,.2,1)',
       cursor: hilite ? 'pointer' : 'default',
-      userSelect: 'none', flexShrink: 0,
+      userSelect: 'none', WebkitUserSelect: 'none',
+      touchAction: 'manipulation', flexShrink: 0,
       color: red ? '#dc2626' : '#1e293b',
       fontFamily: 'Georgia, serif', fontWeight: 'bold',
     }}>
@@ -458,7 +459,7 @@ const SideHand = ({ count, side, scale = 1 }) => {
 // ═══════════════════════════════════════════
 // PLAYER HAND (drag-to-reorder)
 // ═══════════════════════════════════════════
-const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder, scale = 1 }) => {
+const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder, scale = 1, isMobile = false }) => {
   const vd = new Set(validCards(hand, trick, trump).map(c => c.id));
   const spread = Math.round(44 * scale);
   const cardW = Math.round(106 * scale);
@@ -476,34 +477,49 @@ const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder, scale =
         const isSel = sel?.id === card.id;
         const isOver = overIdx === i && dragIdx.current !== i;
         const xPos = n > 1 ? (i / (n - 1)) * (Math.min(totalW, maxW) - cardW) : 0;
+
+        // Touch handler — fires the tap action directly, bypassing any drag interference
+        const handleTap = (e) => {
+          if (!isHilite) return;
+          e.preventDefault();
+          if (isSel) onPlay(card); else onSel(card);
+        };
+
         return (
           <div
             key={card.id}
-            draggable
-            onDragStart={e => { dragIdx.current = i; e.dataTransfer.effectAllowed = 'move'; }}
-            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overIdx !== i) setOverIdx(i); }}
-            onDragLeave={() => setOverIdx(null)}
-            onDrop={e => {
+            // Drag-to-reorder only on desktop — on mobile draggable blocks tap events
+            draggable={!isMobile}
+            onDragStart={!isMobile ? (e => { dragIdx.current = i; e.dataTransfer.effectAllowed = 'move'; }) : undefined}
+            onDragOver={!isMobile ? (e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overIdx !== i) setOverIdx(i); }) : undefined}
+            onDragLeave={!isMobile ? (() => setOverIdx(null)) : undefined}
+            onDrop={!isMobile ? (e => {
               e.preventDefault();
               if (dragIdx.current !== null && dragIdx.current !== i) onReorder(dragIdx.current, i);
               dragIdx.current = null; setOverIdx(null);
-            }}
-            onDragEnd={() => { dragIdx.current = null; setOverIdx(null); }}
+            }) : undefined}
+            onDragEnd={!isMobile ? (() => { dragIdx.current = null; setOverIdx(null); }) : undefined}
+            // On mobile use onTouchEnd so iOS Safari can't cancel the tap via drag detection
+            onTouchEnd={isMobile ? handleTap : undefined}
             style={{
               position: 'absolute', left: xPos, bottom: 0,
               transform: `rotate(${(i - (n - 1) / 2) * 2.5}deg) ${isOver ? `translateY(${Math.round(-14 * scale)}px)` : ''}`,
               transformOrigin: 'bottom center',
               zIndex: isSel ? 20 : isOver ? 15 : i,
               transition: 'left 0.3s ease, transform 0.15s ease, opacity 0.15s',
-              cursor: 'grab', opacity: dragIdx.current === i ? 0.45 : 1,
+              cursor: isMobile ? (isHilite ? 'pointer' : 'default') : 'grab',
+              opacity: dragIdx.current === i ? 0.45 : 1,
+              touchAction: 'manipulation',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
             }}
           >
             <Card
               card={card} hilite={isHilite} sel={isSel} scale={scale}
-              onClick={() => {
+              onClick={!isMobile ? (() => {
                 if (!isHilite) return;
                 if (isSel) onPlay(card); else onSel(card);
-              }}
+              }) : undefined}
             />
           </div>
         );
@@ -1848,6 +1864,7 @@ export default function Sueca() {
               trump={state.trump}
               sel={sel}
               scale={scale}
+              isMobile={isMobile}
               onSel={card => dispatch({ type: 'SEL', card, pi: perspective })}
               onPlay={card => dispatch({ type: 'PLAY', pi: perspective, card })}
               onReorder={(from, to) => dispatch({ type: 'REORDER_HAND', from, to, pi: perspective })}
