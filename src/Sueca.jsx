@@ -415,7 +415,7 @@ const CardBack = ({ small, rotated, scale = 1 }) => {
 // ═══════════════════════════════════════════
 const NorthHand = ({ count, scale = 1 }) => {
   const n = Math.min(count, 10);
-  const spread = Math.round(22 * scale);
+  const spread = Math.round(15 * scale);
   const cardW = Math.round(59 * scale);
   const cardH = Math.round(84 * scale);
   const totalW = n > 1 ? (n - 1) * spread + cardW : cardW;
@@ -435,7 +435,7 @@ const NorthHand = ({ count, scale = 1 }) => {
 
 const SideHand = ({ count, side, scale = 1 }) => {
   const n = Math.min(count, 10);
-  const spread = Math.round(15 * scale);
+  const spread = Math.round(9 * scale);
   const cardW = Math.round(59 * scale);
   const cardH = Math.round(84 * scale);
   const totalH = n > 1 ? (n - 1) * spread + cardW : cardW;
@@ -460,7 +460,7 @@ const SideHand = ({ count, side, scale = 1 }) => {
 // ═══════════════════════════════════════════
 const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder, scale = 1 }) => {
   const vd = new Set(validCards(hand, trick, trump).map(c => c.id));
-  const spread = Math.round(57 * scale);
+  const spread = Math.round(44 * scale);
   const cardW = Math.round(106 * scale);
   const handH = Math.round(121 * scale);
   const maxW = Math.round(700 * scale);
