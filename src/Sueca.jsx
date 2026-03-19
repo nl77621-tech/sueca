@@ -541,7 +541,7 @@ const PlayerHand = ({ hand, trick, trump, sel, onSel, onPlay, onReorder, scale =
 // ═══════════════════════════════════════════
 // TRICK AREA (perspective-aware)
 // ═══════════════════════════════════════════
-const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard = null, trumpLabel = '' }) => {
+const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard = null, trumpLabel = '', dealer = null }) => {
   const p = perspective;
   const positions = {
     [p]:        { gridRow: 3, gridColumn: 2 },
@@ -551,8 +551,10 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard =
   };
   const cell = Math.round(160 * scale);
   const gap = Math.round(10 * scale);
-  const phW = Math.round(96 * scale);
-  const phH = Math.round(134 * scale);
+  // Played cards are 20% larger than the grid scale
+  const cardScale = scale * 1.2;
+  const phW = Math.round(106 * cardScale);
+  const phH = Math.round(147 * cardScale);
   const phBr = Math.round(8 * scale);
   return (
     <div style={{
@@ -565,6 +567,8 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard =
         const pos = positions[pi];
         const play = trick.find(t => t.player === pi);
         const isWinner = trickWinner === pi;
+        // Show trump card in dealer's slot when they haven't played yet
+        const isDealerTrump = trumpCard && dealer === pi && !play;
         return (
           <div key={pi} style={{
             gridRow: pos.gridRow, gridColumn: pos.gridColumn,
@@ -573,13 +577,20 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard =
           }}>
             {play ? (
               <div style={{ position: 'relative', animation: 'cardSlide 0.3s cubic-bezier(.4,0,.2,1)' }}>
-                <Card card={play.card} scale={scale} />
+                <Card card={play.card} scale={cardScale} />
                 {isWinner && (
                   <div style={{
-                    position: 'absolute', top: Math.round(-10 * scale), right: Math.round(-10 * scale),
-                    fontSize: Math.round(18 * scale), animation: 'pulse 0.5s ease-out',
+                    position: 'absolute', top: Math.round(-10 * cardScale), right: Math.round(-10 * cardScale),
+                    fontSize: Math.round(18 * cardScale), animation: 'pulse 0.5s ease-out',
                   }}>⭐</div>
                 )}
+              </div>
+            ) : isDealerTrump ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <div style={{ fontSize: Math.max(7, Math.round(9 * scale)), color: '#fcd34d', letterSpacing: 1, textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontFamily: 'Georgia,serif', fontStyle: 'italic' }}>{trumpLabel}</div>
+                <div style={{ transform: 'rotate(-6deg)', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.7))' }}>
+                  <Card card={trumpCard} small scale={scale * 1.1} />
+                </div>
               </div>
             ) : (
               <div style={{
@@ -590,21 +601,12 @@ const TrickArea = ({ trick, trickWinner, perspective = 0, scale = 1, trumpCard =
           </div>
         );
       })}
-      {/* Centre cell — trump card during first trick, otherwise decorative diamond */}
+      {/* Centre cell — always decorative diamond */}
       <div style={{
         gridRow: 2, gridColumn: 2,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {trumpCard ? (
-          <>
-            <div style={{ fontSize: Math.max(7, Math.round(9 * scale)), color: '#fcd34d', letterSpacing: 1, textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.9)', fontFamily: 'Georgia,serif', fontStyle: 'italic' }}>{trumpLabel}</div>
-            <div style={{ transform: 'rotate(-8deg)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.7))' }}>
-              <Card card={trumpCard} small scale={scale} />
-            </div>
-          </>
-        ) : (
-          <div style={{ color: 'rgba(255,255,255,0.1)', fontSize: Math.round(28 * scale) }}>✦</div>
-        )}
+        <div style={{ color: 'rgba(255,255,255,0.1)', fontSize: Math.round(28 * scale) }}>✦</div>
       </div>
     </div>
   );
@@ -1925,6 +1927,7 @@ export default function Sueca() {
               scale={trickScale}
               trumpCard={trumpCardHeld ? state.trumpCard : null}
               trumpLabel={tr.trumpLabel}
+              dealer={state.dealer}
             />
           </div>
 
